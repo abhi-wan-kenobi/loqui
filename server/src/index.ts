@@ -85,7 +85,7 @@ async function main(): Promise<void> {
           state: snap.state,
           model: snap.model,
           clients: snap.clients,
-          agentAlive: true,
+          agentAlive: snap.agentAlive,
           stt: h.stt,
           tts: h.tts,
         }),

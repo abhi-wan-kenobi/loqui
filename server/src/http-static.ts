@@ -73,6 +73,14 @@ export class StaticServer {
     try {
       const stat = await fsp.stat(file);
       if (!stat.isFile()) return false;
+      // The string guard in serve() doesn't stop a symlink *inside* root from
+      // pointing out of it. Re-check the real path before reading.
+      if (this.root) {
+        const real = await fsp.realpath(file);
+        if (real !== this.root && !real.startsWith(this.root + path.sep)) {
+          return false;
+        }
+      }
       const body = await fsp.readFile(file);
       res.writeHead(200, {
         "Content-Type": contentType(file),

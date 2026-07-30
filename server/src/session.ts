@@ -362,7 +362,17 @@ export class VoiceSession {
   }
 
   /** Current health snapshot for /healthz. */
-  snapshot(): { state: SessionState; model: string; clients: number } {
-    return { state: this.state, model: this.modelKey, clients: this.clients.size };
+  snapshot(): {
+    state: SessionState;
+    model: string;
+    clients: number;
+    agentAlive: boolean;
+  } {
+    return {
+      state: this.state,
+      model: this.modelKey,
+      clients: this.clients.size,
+      agentAlive: this.claude.isAlive,
+    };
   }
 }

@@ -73,24 +73,38 @@ process.on("SIGTERM", () => {
   process.exit(143);
 });
 
-/** Deep-realpath the deepest existing ancestor, rejoin the non-existing tail. */
-function safeResolve(cwd: string, target: string): string {
+/**
+ * Resolve `target` against `cwd`, following symlinks component-by-component —
+ * including BROKEN symlinks, which `fs.existsSync`/`realpathSync` silently skip.
+ * A broken symlink inside the writable dir pointing outside it is a real escape
+ * primitive; `lstat`+`readlink` catch it because they operate on the link, not
+ * its (missing) target.
+ *
+ * Exported for the gate regression test.
+ */
+export function safeResolve(cwd: string, target: string): string {
   const abs = path.resolve(cwd, target);
-  let existing = abs;
-  const tail: string[] = [];
-  while (!fs.existsSync(existing)) {
-    tail.unshift(path.basename(existing));
-    const parent = path.dirname(existing);
-    if (parent === existing) break;
-    existing = parent;
+  const parts = abs.split(path.sep).filter(Boolean);
+  let cur: string = path.sep;
+  for (let i = 0; i < parts.length; i++) {
+    cur = path.join(cur, parts[i]!);
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(cur);
+    } catch {
+      // Component does not exist — the rest of the path is literal. Rejoin it.
+      const rest = parts.slice(i + 1);
+      return rest.length ? path.join(cur, ...rest) : cur;
+    }
+    if (st.isSymbolicLink()) {
+      try {
+        cur = path.resolve(path.dirname(cur), fs.readlinkSync(cur));
+      } catch {
+        /* unreadable link — leave cur as-is */
+      }
+    }
   }
-  let realBase: string;
-  try {
-    realBase = fs.realpathSync(existing);
-  } catch {
-    realBase = existing;
-  }
-  return tail.length ? path.join(realBase, ...tail) : realBase;
+  return cur;
 }
 
 export interface ToolActivity {
@@ -175,6 +189,11 @@ export class ClaudeSession {
     return this.busy;
   }
 
+  /** True while a child process is live (false after the crash-loop cap gives up). */
+  get isAlive(): boolean {
+    return this.proc !== null;
+  }
+
   private loadState(): PersistedState {
     try {
       return JSON.parse(fs.readFileSync(this.statePath, "utf8")) as PersistedState;
@@ -224,10 +243,17 @@ export class ClaudeSession {
     const { cmd, args } = this.buildArgv(resume);
     this.ready = false;
     this.buf = "";
+    // Strip our own secrets from the child's env — it never needs them, and the
+    // child (or the ollama wrapper) can echo its env on debug/error to stderr,
+    // which we capture and log. Leave provider auth (ANTHROPIC/OLLAMA) intact.
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+    for (const k of Object.keys(childEnv)) {
+      if (k.startsWith("LOQUI_")) delete childEnv[k];
+    }
     const proc = spawn(cmd, args, {
       cwd: this.agent.cwd,
       stdio: ["pipe", "pipe", "pipe"],
-      env: process.env,
+      env: childEnv,
     });
     this.proc = proc;
     LIVE.add(proc);
@@ -343,6 +369,9 @@ export class ClaudeSession {
       }
 
       case "result": {
+        // Guard against a second result for the same turn (e.g. an interrupted
+        // turn's result followed by the wrapper's own) double-logging the turn.
+        if (!this.busy) return;
         this.busy = false;
         if (typeof obj.session_id === "string") this.sessionId = obj.session_id;
         this.saveState();
@@ -413,7 +442,12 @@ export class ClaudeSession {
     input: Record<string, any>,
   ): { allow: boolean; message?: string } {
     if (GATED.has(tool)) {
-      const target = input.file_path || input.path || input.filePath || "";
+      const target =
+        input.file_path || input.notebook_path || input.path || input.filePath || "";
+      // No path at all → cannot prove it lands inside the writable dir → deny.
+      if (!target) {
+        return { allow: false, message: "read-only vault — save under Assistant/ instead" };
+      }
       const resolved = safeResolve(this.agent.cwd, String(target));
       const inside =
         resolved === this.writableReal ||
