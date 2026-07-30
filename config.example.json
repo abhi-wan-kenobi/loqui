@@ -1,0 +1,41 @@
+{
+  "server": {
+    "port": 8443,
+    "tls": {
+      "cert": "/path/to/cert.pem",
+      "key": "/path/to/key.pem"
+    }
+  },
+  "stt": {
+    "adapter": "deepgram-ws",
+    "url": "http://127.0.0.1:8383",
+    "tokenEnv": "LOQUI_STT_TOKEN",
+    "sampleRate": 16000,
+    "languages": "en",
+    "batchFallback": true
+  },
+  "tts": {
+    "adapter": "openai-speech",
+    "url": "http://127.0.0.1:8880",
+    "model": "kokoro",
+    "voice": "af_heart",
+    "speed": 1.0,
+    "format": "pcm",
+    "sampleRate": 24000
+  },
+  "agent": {
+    "adapter": "claude-code",
+    "cwd": "/path/to/your/notes",
+    "writableDir": "/path/to/your/notes/Assistant",
+    "defaultModel": "sonnet",
+    "models": {
+      "sonnet": { "wrapper": "anthropic", "model": "sonnet" },
+      "opus": { "wrapper": "anthropic", "model": "opus" },
+      "glm": { "wrapper": "ollama", "model": "glm-5.2:cloud" }
+    },
+    "dailyRotation": true
+  },
+  "log": {
+    "conversationsDir": "/path/to/your/notes/Assistant/Conversations"
+  }
+}
