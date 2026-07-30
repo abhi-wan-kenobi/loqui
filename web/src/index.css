@@ -1,0 +1,55 @@
+:root {
+  --bg: #0a0c13;
+  --bg-vignette: radial-gradient(ellipse at 50% 30%, rgba(99, 102, 241, 0.14), transparent 60%);
+  --violet: #8b5cf6;
+  --indigo: #6366f1;
+  --text: #f5f3ff;
+  --text-dim: rgba(245, 243, 255, 0.45);
+  --text-dimmer: rgba(245, 243, 255, 0.25);
+  --pill-bg: rgba(139, 92, 246, 0.12);
+  --pill-border: rgba(139, 92, 246, 0.35);
+  --surface: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.08);
+  --danger: #f87171;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: var(--bg-vignette);
+  color: var(--text);
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+input {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+}
