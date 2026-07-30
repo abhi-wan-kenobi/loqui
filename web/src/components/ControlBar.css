@@ -1,0 +1,137 @@
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0 8px;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.control-btn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.control-btn.control-btn--active {
+  color: var(--violet);
+  border-color: var(--pill-border);
+  background: var(--pill-bg);
+}
+
+.control-btn--stop:hover {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.mic-btn-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  --mic-level: 0;
+}
+
+.mic-btn-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(139, 92, 246, 0.55);
+  transform: scale(calc(1 + var(--mic-level) * 0.35));
+  opacity: calc(var(--mic-level) * 0.9);
+  transition:
+    transform 60ms linear,
+    opacity 60ms linear;
+  pointer-events: none;
+}
+
+.mic-btn {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 1px solid var(--pill-border);
+  background: radial-gradient(circle at 35% 30%, #a78bfa, var(--violet) 55%, var(--indigo) 100%);
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.mic-btn.mic-btn--held {
+  transform: scale(0.94);
+  box-shadow: 0 0 36px rgba(139, 92, 246, 0.65);
+}
+
+.text-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 14px;
+  padding: 6px 8px 6px 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.text-input-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 16px;
+  padding: 8px 0;
+}
+
+.text-input-bar input::placeholder {
+  color: var(--text-dimmer);
+}
+
+.text-input-bar button {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: none;
+  background: var(--violet);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.text-input-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

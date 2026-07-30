@@ -1,0 +1,77 @@
+.app-shell {
+  height: 100dvh;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: max(24px, env(safe-area-inset-top)) 20px 12px;
+}
+
+.app-top {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.greeting {
+  text-align: center;
+}
+
+.greeting__headline {
+  margin: 0;
+  font-size: clamp(24px, 6vw, 30px);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.greeting__subtitle {
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.app-transcript-slot {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.app-controls {
+  padding: 8px 16px max(18px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.error-banner {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: var(--danger);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (min-width: 720px) {
+  .app-main {
+    gap: 28px;
+  }
+}
