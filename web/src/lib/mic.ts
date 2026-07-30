@@ -27,6 +27,7 @@ export class MicCapture {
   private analyser: AnalyserNode | null = null;
   private levelBuf: Uint8Array<ArrayBuffer> | null = null;
   private levelRaf = 0;
+  private startPromise: Promise<void> | null = null;
 
   constructor(private readonly handlers: MicHandlers) {}
 
@@ -34,9 +35,17 @@ export class MicCapture {
     return this.stream !== null;
   }
 
+  /** Re-entrancy safe: concurrent calls (double pointerdown) share one start. */
   async start(): Promise<void> {
     if (this.stream) return;
+    if (this.startPromise) return this.startPromise;
+    this.startPromise = this.doStart().finally(() => {
+      this.startPromise = null;
+    });
+    return this.startPromise;
+  }
 
+  private async doStart(): Promise<void> {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
@@ -45,52 +54,62 @@ export class MicCapture {
         channelCount: 1,
       },
     });
-    this.stream = stream;
 
-    let ctx: AudioContext;
+    let ctx: AudioContext | null = null;
     try {
-      ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
-    } catch {
-      ctx = new AudioContext();
+      try {
+        ctx = new AudioContext({ sampleRate: MIC_SAMPLE_RATE });
+      } catch {
+        ctx = new AudioContext();
+      }
+      if (ctx.state === "suspended") await ctx.resume();
+
+      await ctx.audioWorklet.addModule("/worklets/mic-processor.js");
+
+      const source = ctx.createMediaStreamSource(stream);
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+
+      const workletNode = new AudioWorkletNode(ctx, "mic-processor", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        channelCount: 1,
+        processorOptions: {
+          inputSampleRate: ctx.sampleRate,
+          targetSampleRate: MIC_SAMPLE_RATE,
+          frameSamples: FRAME_SAMPLES,
+        },
+      });
+      workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+        this.handlers.onFrame(event.data);
+      };
+      source.connect(workletNode);
+
+      // Worklets without a live downstream connection aren't reliably pulled
+      // by every audio graph implementation; route through a muted gain so
+      // it keeps ticking without producing an audible mic-monitor loop.
+      const silentGain = ctx.createGain();
+      silentGain.gain.value = 0;
+      workletNode.connect(silentGain);
+      silentGain.connect(ctx.destination);
+
+      // Assign fields only once the whole graph is wired: a failure above
+      // must not leave a half-open capture that isActive reports as live
+      // (mic indicator stuck on, context never closed, no UI path to stop).
+      this.stream = stream;
+      this.ctx = ctx;
+      this.source = source;
+      this.analyser = analyser;
+      this.levelBuf = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+      this.silentGain = silentGain;
+      this.workletNode = workletNode;
+    } catch (err) {
+      stream.getTracks().forEach((track) => track.stop());
+      if (ctx) await ctx.close().catch(() => undefined);
+      throw err;
     }
-    if (ctx.state === "suspended") await ctx.resume();
-    this.ctx = ctx;
-
-    await ctx.audioWorklet.addModule("/worklets/mic-processor.js");
-
-    const source = ctx.createMediaStreamSource(stream);
-    this.source = source;
-
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    this.analyser = analyser;
-    this.levelBuf = new Uint8Array(new ArrayBuffer(analyser.fftSize));
-    source.connect(analyser);
-
-    const workletNode = new AudioWorkletNode(ctx, "mic-processor", {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      channelCount: 1,
-      processorOptions: {
-        inputSampleRate: ctx.sampleRate,
-        targetSampleRate: MIC_SAMPLE_RATE,
-        frameSamples: FRAME_SAMPLES,
-      },
-    });
-    workletNode.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
-      this.handlers.onFrame(event.data);
-    };
-    source.connect(workletNode);
-
-    // Worklets without a live downstream connection aren't reliably pulled
-    // by every audio graph implementation; route through a muted gain so
-    // it keeps ticking without producing an audible mic-monitor loop.
-    const silentGain = ctx.createGain();
-    silentGain.gain.value = 0;
-    workletNode.connect(silentGain);
-    silentGain.connect(ctx.destination);
-    this.silentGain = silentGain;
-    this.workletNode = workletNode;
 
     this.pollLevel();
   }

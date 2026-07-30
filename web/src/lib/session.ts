@@ -104,5 +104,17 @@ export const useSession = create<SessionStore>((set) => ({
   setConfig: (config) => set({ config }),
   setError: (message) => set({ errorMessage: message }),
 
-  reset: () => set({ liveUser: "", liveAssistant: "", toolActivity: null, history: [] }),
+  // connected/config deliberately survive a reset: they reflect the live
+  // transport, not the session's content.
+  reset: () =>
+    set({
+      liveUser: "",
+      liveAssistant: "",
+      toolActivity: null,
+      history: [],
+      state: "idle",
+      errorMessage: null,
+      micLevel: 0,
+      playbackLevel: 0,
+    }),
 }));

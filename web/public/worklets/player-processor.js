@@ -3,6 +3,11 @@
 // AudioContext's actual rate); process() drains them out, filling silence
 // when starved. A "flush" message (barge-in / tts.flush) resets the ring
 // instantly, dropping everything buffered.
+//
+// The watermark is enforced HERE as well as on the main thread: a push whose
+// main-thread staleness check passed before a flush can still arrive after
+// the flush message (the check-then-postMessage window), so pushes carry
+// their segment id and flushes carry the new minimum valid id.
 
 class PlayerProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -13,12 +18,17 @@ class PlayerProcessor extends AudioWorkletProcessor {
     this.writeIdx = 0;
     this.readIdx = 0;
     this.available = 0;
+    this.minValidSegment = 0;
 
     this.port.onmessage = (event) => {
       const msg = event.data;
       if (msg.type === "push") {
+        if (typeof msg.segmentId === "number" && msg.segmentId < this.minValidSegment) {
+          return; // stale segment that raced past a flush — drop at insertion
+        }
         this._push(new Float32Array(msg.samples));
       } else if (msg.type === "flush") {
+        if (typeof msg.minValid === "number") this.minValidSegment = msg.minValid;
         this.readIdx = this.writeIdx;
         this.available = 0;
       }

@@ -159,6 +159,8 @@ export function App() {
       micRef.current.stop();
       setMicHeld(false);
     }
+    // Stop means silence NOW — drop any TTS still buffered in the worklet.
+    playerRef.current?.flush();
     wsRef.current?.send({ type: "session.stop" });
   };
 

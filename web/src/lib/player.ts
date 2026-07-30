@@ -66,10 +66,16 @@ export class Player {
     this.maxSeenSegment = Math.max(this.maxSeenSegment, segmentId);
 
     await this.ready;
+    // Re-check after the await: a flush() may have run while we yielded, and
+    // its message would reach the worklet *before* this push (MessagePort is
+    // FIFO), re-adding stale audio to a freshly cleared ring.
+    if (segmentId < this.minValidSegment) return;
     const int16 = new Int16Array(pcm);
     const samples = this.resample(int16);
     const buf = samples.buffer;
-    this.node?.port.postMessage({ type: "push", samples: buf }, [buf]);
+    // The worklet enforces the watermark too (belt and braces): pushes carry
+    // their segment id, flushes carry the new minimum.
+    this.node?.port.postMessage({ type: "push", segmentId, samples: buf }, [buf]);
   }
 
   private resample(int16: Int16Array): Float32Array {
@@ -94,7 +100,7 @@ export class Player {
   /** Drop all buffered audio instantly (barge-in / server tts.flush). */
   flush(): void {
     this.minValidSegment = this.maxSeenSegment + 1;
-    this.node?.port.postMessage({ type: "flush" });
+    this.node?.port.postMessage({ type: "flush", minValid: this.minValidSegment });
   }
 
   /** 0..1 RMS level of what's currently playing, for orb pulsing. */

@@ -50,7 +50,10 @@ class MicProcessor extends AudioWorkletProcessor {
       this.readPos += this.ratio;
     }
 
-    const consumed = Math.floor(this.readPos);
+    // Clamp: on a boundary iteration readPos can float past the buffer end;
+    // slice() would silently clamp while readPos kept the unclamped value,
+    // leaving readPos negative next frame (glitched first sample).
+    const consumed = Math.min(Math.floor(this.readPos), this.inputBuf.length);
     if (consumed > 0) {
       this.inputBuf = this.inputBuf.slice(consumed);
       this.readPos -= consumed;
