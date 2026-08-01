@@ -52,14 +52,41 @@ if (instance.available !== 0) fail(`flush left ${instance.available} samples`);
 post({ type: "push", segmentId: 0, samples: new Float32Array(480).fill(0.5).buffer });
 if (instance.available !== 0) fail(`stale push survived the flush: ${instance.available} samples re-buffered`);
 
-// 4. Fresh audio for the next segment still plays.
+// 4. Fresh audio for the next segment still buffers.
 post({ type: "push", segmentId: 1, samples: new Float32Array(240).fill(0.5).buffer });
 if (instance.available !== 240) fail(`fresh push after flush rejected: ${instance.available}`);
 
-// 5. process() drains the ring.
+// 5. JITTER BUFFER: 240 samples is under the ~150ms prime threshold (3600 @
+//    24k) and the segment hasn't ended, so process() outputs silence and does
+//    NOT drain — the first words wait for enough buffer.
 const out = [new Float32Array(128)];
 instance.process([], [out]);
-if (instance.available !== 240 - 128) fail(`process() drained wrong: ${instance.available}`);
-if (out[0][0] !== 0.5) fail("process() output wrong sample");
+if (instance.available !== 240) fail(`unprimed segment drained early: ${instance.available}`);
+if (out[0][0] !== 0) fail("unprimed segment should output silence");
 
-console.log("PASS: stale in-flight push dropped after flush; fresh segment plays; ring drains");
+// 6. Segment-end marker releases a sub-threshold final segment: it primes and
+//    drains even though it never reached the threshold.
+post({ type: "end" });
+instance.process([], [out]);
+if (instance.available !== 240 - 128) fail(`ended segment drained wrong: ${instance.available}`);
+if (out[0][0] !== 0.5) fail("ended segment output wrong sample");
+
+// 7. Draining an ended segment to empty re-arms the jitter buffer, so the next
+//    segment jitters again from scratch.
+instance.process([], [out]); // drains remaining 112, hits 0, re-arms
+if (instance.available !== 0) fail(`ended segment not fully drained: ${instance.available}`);
+post({ type: "push", segmentId: 2, samples: new Float32Array(200).fill(0.25).buffer });
+instance.process([], [out]);
+if (instance.available !== 200) fail(`next segment did not re-jitter: ${instance.available}`);
+if (out[0][0] !== 0) fail("re-armed jitter buffer should output silence");
+
+// 8. Crossing the prime threshold auto-starts playback (no end marker needed).
+post({ type: "flush", minValid: 3 }); // clear + re-arm
+post({ type: "push", segmentId: 3, samples: new Float32Array(4000).fill(0.5).buffer });
+instance.process([], [out]);
+if (instance.available !== 4000 - 128) fail(`threshold priming failed to drain: ${instance.available}`);
+if (out[0][0] !== 0.5) fail("threshold-primed output wrong sample");
+
+console.log(
+  "PASS: stale push dropped after flush; jitter buffer holds sub-threshold start, releases on end marker and on threshold, re-arms per segment",
+);
