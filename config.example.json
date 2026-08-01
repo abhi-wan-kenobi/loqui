@@ -1,6 +1,7 @@
 {
   "server": {
     "port": 8443,
+    "httpPort": 8480,
     "tls": {
       "cert": "/path/to/cert.pem",
       "key": "/path/to/key.pem"

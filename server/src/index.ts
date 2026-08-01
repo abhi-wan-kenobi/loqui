@@ -120,7 +120,26 @@ async function main(): Promise<void> {
     res.end(PLACEHOLDER_HTML);
   };
 
-  // ---- create server (TLS if certs present) ----
+  // ---- WebSocket at /ws (shared by every listener) ----
+  const wss = new WebSocketServer({ noServer: true });
+  const attachWs = (srv: http.Server | https.Server): void => {
+    srv.on("upgrade", (req, socket, head) => {
+      const pathname = (req.url ?? "/").split("?")[0];
+      if (pathname !== "/ws") {
+        socket.destroy();
+        return;
+      }
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        voice.addClient(ws);
+      });
+    });
+    srv.on("error", (err) => {
+      process.stderr.write(`[loqui] server error: ${String(err)}\n`);
+      process.exit(1);
+    });
+  };
+
+  // ---- primary server (TLS if certs present) ----
   let server: http.Server | https.Server;
   let scheme = "https";
   const tls = cfg.server.tls;
@@ -142,25 +161,9 @@ async function main(): Promise<void> {
     );
     server = http.createServer((req, res) => void requestHandler(req, res));
   }
-
-  // ---- WebSocket at /ws ----
-  const wss = new WebSocketServer({ noServer: true });
-  server.on("upgrade", (req, socket, head) => {
-    const pathname = (req.url ?? "/").split("?")[0];
-    if (pathname !== "/ws") {
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      voice.addClient(ws);
-    });
-  });
+  attachWs(server);
 
   const port = cfg.server.port;
-  server.on("error", (err) => {
-    process.stderr.write(`[loqui] server error: ${String(err)}\n`);
-    process.exit(1);
-  });
   server.listen(port, () => {
     process.stdout.write(
       `[loqui] listening on ${scheme}://0.0.0.0:${port}  (ws at ${scheme === "https" ? "wss" : "ws"}://<host>:${port}/ws)\n`,
@@ -170,10 +173,28 @@ async function main(): Promise<void> {
     );
   });
 
+  // ---- optional second plaintext HTTP listener (LAN Android app, no certs) ----
+  // Only start it when TLS is actually in use on the primary; otherwise the
+  // primary is already plain HTTP and a duplicate on the same handler is noise.
+  let httpServer: http.Server | undefined;
+  const httpPort = cfg.server.httpPort;
+  if (httpPort && httpPort !== port) {
+    httpServer = http.createServer((req, res) => void requestHandler(req, res));
+    attachWs(httpServer);
+    httpServer.listen(httpPort, () => {
+      process.stdout.write(
+        `[loqui] plaintext listening on http://0.0.0.0:${httpPort}  (ws at ws://<host>:${httpPort}/ws)\n`,
+      );
+    });
+  }
+
   const shutdown = () => {
     process.stdout.write("\n[loqui] shutting down\n");
     void claude.dispose().finally(() => {
-      server.close(() => process.exit(0));
+      server.close(() => {
+        if (httpServer) httpServer.close(() => process.exit(0));
+        else process.exit(0);
+      });
       setTimeout(() => process.exit(0), 2000);
     });
   };

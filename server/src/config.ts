@@ -20,6 +20,8 @@ export interface TlsConfig {
 export interface ServerConfig {
   port: number;
   tls?: TlsConfig;
+  /** Optional plaintext HTTP listener (LAN Android app has no cert to trust). */
+  httpPort?: number;
 }
 
 export interface SttConfig {
