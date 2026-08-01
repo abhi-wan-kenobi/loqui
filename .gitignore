@@ -3,3 +3,13 @@ dist/
 data/
 *.log
 .env
+.env.local
+
+# Android (Capacitor)
+*.jks
+*.keystore
+web/android/.gradle/
+web/android/build/
+web/android/app/build/
+web/android/local.properties
+web/android/app/release/
