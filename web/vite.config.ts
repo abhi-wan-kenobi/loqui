@@ -1,5 +1,8 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
+
+const { version } = createRequire(import.meta.url)("./package.json") as { version: string };
 
 // Dev-only: Vite proxies /ws to the loqui server so the browser client can
 // always speak to same-origin `wss://${location.host}/ws` in every
@@ -11,6 +14,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    define: {
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(version),
+    },
     server: {
       proxy: {
         "/ws": {
