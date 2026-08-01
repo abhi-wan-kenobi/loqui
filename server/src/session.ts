@@ -60,6 +60,11 @@ export class VoiceSession {
   private resultReceived = false;
   private lastCostUsd: number | undefined;
   private segmentSeq = 0;
+  // Bumped whenever a turn is abandoned (barge-in / stop / start); async turn
+  // code re-checks it after every await and bails if it no longer matches.
+  private turnEpoch = 0;
+  // The epoch of the turn currently driving the agent callbacks.
+  private activeTurnEpoch = 0;
 
   // per-turn timings
   private turnAgentStart = 0;
@@ -154,11 +159,13 @@ export class VoiceSession {
     switch (msg.type) {
       case "session.start":
         this.micOwner = ws;
+        this.abortCurrentTurn();
         this.teardownSttStream();
         this.resetMic();
         this.setState("listening");
         break;
       case "session.stop":
+        this.abortCurrentTurn();
         this.teardownSttStream();
         this.resetMic();
         this.setState("idle");
@@ -302,6 +309,7 @@ export class VoiceSession {
 
   private async finalizeUtterance(): Promise<void> {
     if (this.state !== "listening") return;
+    const epoch = ++this.turnEpoch;
     this.setState("thinking");
     const sttStart = Date.now();
     let transcript = "";
@@ -315,6 +323,8 @@ export class VoiceSession {
       } catch {
         /* use whatever segments we already have */
       }
+      // The user may have torn the session down while we awaited the tail.
+      if (epoch !== this.turnEpoch) return;
       transcript = this.sttSegments.join(" ").replace(/\s+/g, " ").trim();
       // Segments were already broadcast live; tear the stream down.
       this.teardownSttStream();
@@ -335,11 +345,13 @@ export class VoiceSession {
       try {
         transcript = await this.stt.transcribeUtterance(pcm);
       } catch (err) {
+        if (epoch !== this.turnEpoch) return;
         const message = err instanceof Error ? err.message : String(err);
         this.broadcast({ type: "error", message });
         this.setState("listening");
         return;
       }
+      if (epoch !== this.turnEpoch) return;
       this.broadcast({ type: "stt.segment", text: transcript, final: true });
     }
 
@@ -349,18 +361,20 @@ export class VoiceSession {
       this.setState("listening");
       return;
     }
-    await this.startAgentTurn(transcript);
+    await this.startAgentTurn(transcript, epoch);
   }
 
   private async runTextPrompt(text: string): Promise<void> {
     const t = (text ?? "").trim();
     if (!t) return;
+    const epoch = ++this.turnEpoch;
     this.turnSttMs = undefined; // no STT stage for a typed prompt
     this.setState("thinking");
-    await this.startAgentTurn(t);
+    await this.startAgentTurn(t, epoch);
   }
 
-  private async startAgentTurn(userText: string): Promise<void> {
+  private async startAgentTurn(userText: string, epoch: number): Promise<void> {
+    this.activeTurnEpoch = epoch;
     this.currentUserText = userText;
     this.currentAssistantText = "";
     this.resultReceived = false;
@@ -372,6 +386,7 @@ export class VoiceSession {
     try {
       await this.claude.sendUser(userText);
     } catch (err) {
+      if (epoch !== this.turnEpoch) return;
       this.broadcast({
         type: "error",
         message: `agent error: ${err instanceof Error ? err.message : String(err)}`,
@@ -381,6 +396,8 @@ export class VoiceSession {
   }
 
   private onAgentDelta(text: string): void {
+    // Ignore stragglers from a turn the user already abandoned.
+    if (this.activeTurnEpoch !== this.turnEpoch) return;
     if (!text) return;
     if (!this.turnFirstDeltaAt) this.turnFirstDeltaAt = Date.now();
     this.currentAssistantText += text;
@@ -391,6 +408,9 @@ export class VoiceSession {
   }
 
   private onAgentResult(costUsd?: number): void {
+    // A result for an abandoned turn (e.g. the truncated turn after an
+    // interrupt): don't broadcast assistant.done or log a partial turn.
+    if (this.activeTurnEpoch !== this.turnEpoch) return;
     this.resultReceived = true;
     this.lastCostUsd = costUsd;
     // Flush any trailing partial sentence to TTS.
@@ -442,12 +462,24 @@ export class VoiceSession {
 
   private bargeIn(): void {
     if (this.state !== "speaking" && this.state !== "thinking") return;
+    this.abortCurrentTurn();
+    this.teardownSttStream();
+    this.resetMic();
+    this.setState("listening");
+  }
+
+  /**
+   * Abandon any in-flight turn: bump the epoch (so awaiting turn code bails),
+   * flush the TTS queue + tell clients to drop buffered audio, interrupt the
+   * agent if it's mid-generation, and clear the turn-complete flag. Callers set
+   * the resulting state themselves.
+   */
+  private abortCurrentTurn(): void {
+    this.turnEpoch += 1;
     this.ttsQueue.flush();
     this.broadcast({ type: "tts.flush" });
-    this.claude.interrupt();
-    this.teardownSttStream();
+    if (this.claude.isBusy) this.claude.interrupt();
     this.resultReceived = false;
-    this.setState("listening");
   }
 
   private async applyConfig(msg: {
@@ -455,7 +487,13 @@ export class VoiceSession {
     voice?: string;
     speed?: number;
   }): Promise<void> {
-    if (typeof msg.voice === "string" && msg.voice) this.voice = msg.voice;
+    if (typeof msg.voice === "string" && msg.voice) {
+      if (KOKORO_VOICES.includes(msg.voice)) {
+        this.voice = msg.voice;
+      } else {
+        this.broadcast({ type: "error", message: `unknown voice: ${msg.voice}` });
+      }
+    }
     if (typeof msg.speed === "number" && msg.speed > 0) this.speed = msg.speed;
     if (
       typeof msg.model === "string" &&
@@ -465,9 +503,10 @@ export class VoiceSession {
       if (!this.cfg.agent.models[msg.model]) {
         this.broadcast({ type: "error", message: `unknown model: ${msg.model}` });
       } else {
-        this.modelKey = msg.model;
         try {
           await this.claude.switchModel(msg.model);
+          // Only advertise the new model once the switch actually succeeded.
+          this.modelKey = msg.model;
         } catch (err) {
           this.broadcast({
             type: "error",

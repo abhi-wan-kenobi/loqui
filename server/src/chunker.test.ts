@@ -11,6 +11,21 @@ test("splits into sentences on enders past the min length", () => {
   assert.equal(out[1], "You should carry some water with you.");
 });
 
+test("never emits a segment longer than maxLen, even with a late ender", () => {
+  // An ender only after 260 chars must not produce a 261-char sentence.
+  const out = chunkAll("A".repeat(260) + ". " + "B".repeat(10));
+  for (const seg of out) assert.ok(seg.length <= 250, `segment ${seg.length} > 250`);
+  // No text lost: 260 A + 1 period + 10 B = 271 non-whitespace chars.
+  assert.equal(out.join("").replace(/\s/g, "").length, 271);
+});
+
+test("hard-cut fuzz keeps every segment within maxLen", () => {
+  for (let len = 240; len <= 600; len += 37) {
+    const out = chunkAll("x".repeat(len) + "! done.");
+    for (const seg of out) assert.ok(seg.length <= 250, `len ${len}: seg ${seg.length}`);
+  }
+});
+
 test("does not split on a decimal point", () => {
   const out = chunkAll(
     "The apartment costs about 3.5 lakh rupees per month which is a lot.",

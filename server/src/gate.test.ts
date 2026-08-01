@@ -30,6 +30,17 @@ test("gate path resolution blocks every escape vector", () => {
     fs.symlinkSync(notes, path.join(assistant, "reallink"));
     // broken symlink Assistant/brokenlink -> outside/ghost (target missing)
     fs.symlinkSync(path.join(outside, "ghost"), path.join(assistant, "brokenlink"));
+    // multi-level chain: Assistant/chainC -> chainB -> chainA -> outside
+    fs.symlinkSync(outside, path.join(assistant, "chainA"));
+    fs.symlinkSync(path.join(assistant, "chainA"), path.join(assistant, "chainB"));
+    fs.symlinkSync(path.join(assistant, "chainB"), path.join(assistant, "chainC"));
+    // symlink -> symlink -> outside FILE
+    fs.writeFileSync(path.join(outside, "target.txt"), "x");
+    fs.symlinkSync(path.join(outside, "target.txt"), path.join(assistant, "fileLinkA"));
+    fs.symlinkSync(path.join(assistant, "fileLinkA"), path.join(assistant, "fileLinkB"));
+    // symlink loop
+    fs.symlinkSync(path.join(assistant, "loopB"), path.join(assistant, "loopA"));
+    fs.symlinkSync(path.join(assistant, "loopA"), path.join(assistant, "loopB"));
 
     const writableReal = fs.realpathSync(assistant);
     const check = (t: string) => inside(writableReal, safeResolve(cwd, t));
@@ -45,6 +56,12 @@ test("gate path resolution blocks every escape vector", () => {
     assert.equal(check("Assistant/../Notes/x.md"), false);
     assert.equal(check("/etc/passwd"), false);
     assert.equal(check("Notes/x.md"), false);
+    // Denied: kimi-found vectors (multi-level chains, link-to-link file, NUL, loops)
+    assert.equal(check("Assistant/chainC/hacked.md"), false); // chain of 3 links out
+    assert.equal(check("Assistant/chainB/hacked.md"), false); // chain of 2 links out
+    assert.equal(check("Assistant/fileLinkB"), false); // link->link->outside file
+    assert.equal(check("Assistant/ok.md\0.evil"), false); // NUL-byte path
+    assert.equal(check("Assistant/loopA/x.md"), false); // symlink loop -> sentinel
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

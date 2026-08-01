@@ -15,7 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { loadConfig, sttToken, stateDir } from "./config.js";
+import { loadConfig, sttToken, stateDir, ConfigError } from "./config.js";
 import { StaticServer } from "./http-static.js";
 import { makeSttAdapter } from "./stt.js";
 import { OpenAiSpeechAdapter } from "./tts.js";
@@ -190,6 +190,14 @@ async function main(): Promise<void> {
 
   const shutdown = () => {
     process.stdout.write("\n[loqui] shutting down\n");
+    // Send a clean close frame to every WS client instead of a bare TCP reset.
+    for (const client of wss.clients) {
+      try {
+        client.close(1001, "server shutting down");
+      } catch {
+        /* ignore */
+      }
+    }
     void claude.dispose().finally(() => {
       server.close(() => {
         if (httpServer) httpServer.close(() => process.exit(0));
@@ -203,6 +211,10 @@ async function main(): Promise<void> {
 }
 
 main().catch((e) => {
-  process.stderr.write(`[loqui] FATAL ${e instanceof Error ? e.stack : String(e)}\n`);
+  if (e instanceof ConfigError) {
+    process.stderr.write(`[loqui] configuration error:\n  ${e.message}\n`);
+  } else {
+    process.stderr.write(`[loqui] FATAL ${e instanceof Error ? e.stack : String(e)}\n`);
+  }
   process.exit(1);
 });

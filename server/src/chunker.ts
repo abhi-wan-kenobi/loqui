@@ -83,7 +83,12 @@ export class SentenceChunker {
     const buf = this.buf;
     const n = buf.length;
 
-    for (let i = 0; i < n; i++) {
+    // Only look for a natural boundary within the first maxLen chars; a sentence
+    // ender that appears later must NOT produce an over-length segment — the hard
+    // cut below handles the overrun instead.
+    const scanLimit = Math.min(n, this.maxLen);
+
+    for (let i = 0; i < scanLimit; i++) {
       const c = buf.charAt(i);
 
       if (c === "\n") {

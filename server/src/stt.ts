@@ -328,6 +328,9 @@ class DeepgramStream implements SttStream {
 
   finalize(timeoutMs: number): Promise<void> {
     if (this.closed) return Promise.resolve();
+    // Idempotent: a second finalize settles the first's promise + timer rather
+    // than orphaning them (the first awaiter would otherwise hang forever).
+    if (this.tailResolve) this.resolveTail();
     return new Promise<void>((resolve) => {
       this.tailResolve = resolve;
       this.tailTimer = setTimeout(() => this.resolveTail(), timeoutMs);

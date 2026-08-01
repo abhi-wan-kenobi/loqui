@@ -117,7 +117,10 @@ export class OpenAiSpeechAdapter implements TtsAdapter {
     const aligner = new ByteAligner();
     for await (const chunk of reader) {
       if (signal.aborted) return;
-      const buf = Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+      // COPY, don't view: `chunk` aliases undici's response-buffer pool, which is
+      // reused on the next read. ByteAligner holds bytes in `pending` across that
+      // read, so a view would be silently overwritten -> garbled audio.
+      const buf = Buffer.from(chunk);
       for (const out of aligner.push(buf)) yield out;
     }
     if (signal.aborted) return;

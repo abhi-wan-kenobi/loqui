@@ -26,6 +26,16 @@ export async function keepAwake(): Promise<void> {
       /* fall through to the web wake lock */
     }
   }
+  // Release any lock we already hold before requesting a new one, so repeated
+  // keepAwake() calls (start -> stop -> start) can't orphan a sentinel.
+  if (wakeLock) {
+    try {
+      await wakeLock.release();
+    } catch {
+      /* ignore */
+    }
+    wakeLock = null;
+  }
   try {
     wakeLock = (await navigator.wakeLock?.request("screen")) ?? null;
   } catch {

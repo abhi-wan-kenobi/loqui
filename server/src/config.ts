@@ -112,22 +112,38 @@ function loadDotEnv(envPath: string): void {
   }
 }
 
+/** A configuration problem the user must fix — reported without a stack trace. */
+export class ConfigError extends Error {}
+
 export function loadConfig(): LoquiConfig {
   const configPath = process.env.LOQUI_CONFIG || DEFAULT_CONFIG_PATH;
-  const raw = fs.readFileSync(configPath, "utf8");
-  const cfg = JSON.parse(raw) as LoquiConfig;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(configPath, "utf8");
+  } catch {
+    throw new ConfigError(
+      `config file not found at ${configPath}\n` +
+        "  Copy config.example.json there and edit it, or set LOQUI_CONFIG to its path.",
+    );
+  }
+  let cfg: LoquiConfig;
+  try {
+    cfg = JSON.parse(raw) as LoquiConfig;
+  } catch (e) {
+    throw new ConfigError(`config file ${configPath} is not valid JSON: ${String(e)}`);
+  }
 
   // Load the sibling .env so secrets are available (dev / manual run).
   loadDotEnv(path.join(path.dirname(configPath), ".env"));
 
   // Light validation of the load-bearing fields.
-  if (!cfg.server?.port) throw new Error("config: server.port missing");
-  if (!cfg.agent?.cwd) throw new Error("config: agent.cwd missing");
+  if (!cfg.server?.port) throw new ConfigError("config: server.port missing");
+  if (!cfg.agent?.cwd) throw new ConfigError("config: agent.cwd missing");
   if (!cfg.agent?.models || Object.keys(cfg.agent.models).length === 0) {
-    throw new Error("config: agent.models missing");
+    throw new ConfigError("config: agent.models missing");
   }
   if (!cfg.agent.models[cfg.agent.defaultModel]) {
-    throw new Error(
+    throw new ConfigError(
       `config: agent.defaultModel '${cfg.agent.defaultModel}' not in agent.models`,
     );
   }

@@ -80,28 +80,45 @@ process.on("SIGTERM", () => {
  * primitive; `lstat`+`readlink` catch it because they operate on the link, not
  * its (missing) target.
  *
+ * When a component is a symlink, its target is spliced back into the unresolved
+ * component queue and the walk restarts from root — this is what makes
+ * multi-level chains (link -> link -> outside) resolve fully; a single
+ * substitution pass does not. Hop count is capped like the kernel's ELOOP.
+ *
+ * Returns a sentinel starting with "\0" for paths that must never be treated as
+ * inside the writable dir (NUL bytes, symlink loops).
+ *
  * Exported for the gate regression test.
  */
 export function safeResolve(cwd: string, target: string): string {
-  const abs = path.resolve(cwd, target);
-  const parts = abs.split(path.sep).filter(Boolean);
+  if (target.includes("\0")) return "\0nul-byte-path";
+  let rest = path.resolve(cwd, target).split(path.sep).filter(Boolean);
   let cur: string = path.sep;
-  for (let i = 0; i < parts.length; i++) {
-    cur = path.join(cur, parts[i]!);
+  let hops = 0;
+  while (rest.length > 0) {
+    const cand = path.join(cur, rest.shift()!);
     let st: fs.Stats;
     try {
-      st = fs.lstatSync(cur);
+      st = fs.lstatSync(cand);
     } catch {
       // Component does not exist — the rest of the path is literal. Rejoin it.
-      const rest = parts.slice(i + 1);
-      return rest.length ? path.join(cur, ...rest) : cur;
+      return rest.length ? path.join(cand, ...rest) : cand;
     }
     if (st.isSymbolicLink()) {
+      if (++hops > 40) return "\0symlink-loop";
+      let link: string;
       try {
-        cur = path.resolve(path.dirname(cur), fs.readlinkSync(cur));
+        link = fs.readlinkSync(cand);
       } catch {
-        /* unreadable link — leave cur as-is */
+        cur = cand;
+        continue;
       }
+      // Splice the link target in and restart from root so chains resolve.
+      const resolved = path.resolve(path.dirname(cand), link);
+      rest = [...resolved.split(path.sep).filter(Boolean), ...rest];
+      cur = path.sep;
+    } else {
+      cur = cand;
     }
   }
   return cur;
