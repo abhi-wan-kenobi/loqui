@@ -92,8 +92,11 @@ async function testLoop() {
     deltaCount: 0,
     audioBytes: 0,
     audioFrames: 0,
+    oddFrames: 0, // binary frames whose PCM payload length is odd (the static bug)
+    minFrame: Infinity,
     doneText: "",
     cost: undefined,
+    timings: undefined,
     gotConfig: false,
     gotState: false,
   };
@@ -102,7 +105,10 @@ async function testLoop() {
     if (isBinary) {
       if (!metrics.firstAudioAt) metrics.firstAudioAt = Date.now();
       metrics.audioFrames++;
-      metrics.audioBytes += data.length - 4; // minus segment-id prefix
+      const payload = data.length - 4; // minus 4-byte segment-id prefix
+      metrics.audioBytes += payload;
+      if (payload % 2 !== 0) metrics.oddFrames++; // MUST be 0 (sample-grid aligned)
+      if (payload < metrics.minFrame) metrics.minFrame = payload;
       return;
     }
     let msg;
@@ -121,6 +127,7 @@ async function testLoop() {
       metrics.doneAt = Date.now();
       metrics.doneText = msg.text;
       metrics.cost = msg.costUsd;
+      metrics.timings = msg.timings;
     }
     if (msg.type === "error") console.log(`  [server error] ${msg.message}`);
   });
@@ -145,7 +152,9 @@ async function testLoop() {
   ws.send(
     JSON.stringify({
       type: "text.prompt",
-      text: "Say the word ping and nothing else.",
+      // Multi-sentence so TTS starts before the agent result -> firstAudioMs is
+      // captured, and the alignment fix is exercised across several segments.
+      text: "In three short sentences, tell me about the weather in Delhi today. Keep each sentence brief.",
     }),
   );
 
@@ -153,8 +162,12 @@ async function testLoop() {
   const t1 = Date.now();
   while (!metrics.doneAt && Date.now() - t1 < 120000) await sleep(100);
 
-  // give trailing TTS a moment
-  await sleep(1500);
+  // Let TTS drain: wait until the first audio frame arrives (up to 20s after
+  // done — the ollama-wrapped model can stream its whole answer late), then a
+  // couple more seconds to collect the full multi-sentence stream.
+  const t2 = Date.now();
+  while (!metrics.firstAudioAt && Date.now() - t2 < 20000) await sleep(100);
+  await sleep(2500);
 
   if (metrics.deltaCount > 0) ok(`assistant.delta arrived (${metrics.deltaCount} deltas)`);
   else bad("no assistant.delta");
@@ -162,6 +175,18 @@ async function testLoop() {
   else bad("no assistant.done");
   if (metrics.audioFrames > 0) ok(`binary TTS frames arrived (${metrics.audioFrames} frames, ${metrics.audioBytes} PCM bytes)`);
   else bad("no TTS audio frames");
+
+  // The static-bug end-to-end check: EVERY binary frame's PCM payload must be
+  // even-length (sample-grid aligned) or int16 decode byte-swaps -> white noise.
+  if (metrics.audioFrames > 0 && metrics.oddFrames === 0)
+    ok(`all ${metrics.audioFrames} TTS frames have EVEN payload length (min frame ${metrics.minFrame} bytes)`);
+  else if (metrics.audioFrames > 0)
+    bad(`${metrics.oddFrames}/${metrics.audioFrames} TTS frames have ODD payload length (alignment bug!)`);
+
+  // assistant.done must carry the per-stage timings object.
+  if (metrics.timings && (metrics.timings.ttfbMs !== undefined || metrics.timings.firstAudioMs !== undefined))
+    ok(`assistant.done carries timings ${JSON.stringify(metrics.timings)}`);
+  else bad(`assistant.done missing timings (got ${JSON.stringify(metrics.timings)})`);
 
   const ttfd = metrics.firstDeltaAt ? metrics.firstDeltaAt - metrics.promptSentAt : -1;
   const ttfa = metrics.firstAudioAt ? metrics.firstAudioAt - metrics.promptSentAt : -1;
