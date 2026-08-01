@@ -10,14 +10,14 @@ export type StatusPillProps = {
 function pillText(state: SessionState, toolActivity: ToolActivity | null): string | null {
   switch (state) {
     case "listening":
-      return "Go ahead, I'm listening…";
+      return "Listening…";
     case "thinking":
       if (toolActivity) {
         return toolActivity.detail ? `Using ${toolActivity.tool} — ${toolActivity.detail}` : `Using ${toolActivity.tool}…`;
       }
       return "Thinking…";
     case "speaking":
-      return "Speaking — tap to interrupt";
+      return "Tap or speak to interrupt";
     case "idle":
     default:
       return null;

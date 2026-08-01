@@ -35,6 +35,14 @@ export class MicCapture {
     return this.stream !== null;
   }
 
+  /**
+   * The live capture MediaStream, or null if not started. Shared with the VAD
+   * so the mic is only opened once (getUserMedia is not called twice).
+   */
+  getStream(): MediaStream | null {
+    return this.stream;
+  }
+
   /** Re-entrancy safe: concurrent calls (double pointerdown) share one start. */
   async start(): Promise<void> {
     if (this.stream) return;

@@ -20,6 +20,8 @@ export type ToolActivity = {
   detail?: string;
 };
 
+export type Timings = { sttMs?: number; ttfbMs?: number; firstAudioMs?: number };
+
 let idCounter = 0;
 const nextId = (): string => `t${Date.now()}-${idCounter++}`;
 
@@ -38,6 +40,8 @@ type SessionStore = {
   config: ConfigInfo | null;
   history: TranscriptEntry[];
   errorMessage: string | null;
+  /** Latency breakdown from the last assistant.done, for the debug row. */
+  lastTimings: Timings | null;
 
   setConnected: (v: boolean) => void;
   setState: (s: SessionState) => void;
@@ -45,7 +49,7 @@ type SessionStore = {
   setPlaybackLevel: (v: number) => void;
   appendSttSegment: (text: string) => void;
   appendAssistantDelta: (text: string) => void;
-  finalizeAssistant: (text: string) => void;
+  finalizeAssistant: (text: string, timings?: Timings) => void;
   addUserText: (text: string) => void;
   setToolActivity: (activity: ToolActivity | null) => void;
   setConfig: (config: ConfigInfo) => void;
@@ -64,6 +68,7 @@ export const useSession = create<SessionStore>((set) => ({
   config: null,
   history: [],
   errorMessage: null,
+  lastTimings: null,
 
   setConnected: (v) => set({ connected: v }),
 
@@ -91,9 +96,10 @@ export const useSession = create<SessionStore>((set) => ({
 
   appendAssistantDelta: (text) => set((s) => ({ liveAssistant: s.liveAssistant + text })),
 
-  finalizeAssistant: (text) =>
+  finalizeAssistant: (text, timings) =>
     set((s) => ({
       liveAssistant: "",
+      lastTimings: timings ?? s.lastTimings,
       history: [...s.history, { id: nextId(), role: "assistant", text }],
     })),
 
@@ -116,5 +122,6 @@ export const useSession = create<SessionStore>((set) => ({
       errorMessage: null,
       micLevel: 0,
       playbackLevel: 0,
+      lastTimings: null,
     }),
 }));
