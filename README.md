@@ -28,10 +28,11 @@ edit anything else.
 
 ## Features
 
-- **Phone-first installable PWA** — add to home screen, full-screen orb, works on any
-  modern browser (desktop too). One codebase.
-- **Open mic + barge-in** (v0.2) — talk naturally, interrupt mid-sentence. Barge-in
-  uses the agent's native interrupt, so context is preserved.
+- **Android app + browser PWA from one codebase** — install the APK from Releases
+  (no certificates, plain `ws://` on your LAN), or add the PWA to your home screen.
+- **Open mic + barge-in** — talk naturally, interrupt mid-sentence. Barge-in
+  uses the agent's native interrupt, so context is preserved. Streaming STT
+  transcribes while you speak.
 - **Pluggable adapters** — STT (`deepgram-ws`), TTS (`openai-speech`), agent
   (`claude-code` | `openai-chat`). Add your own by implementing one interface.
 - **Read-only by construction** — the Claude Code agent adapter gates every write
@@ -50,7 +51,7 @@ A single Node/TypeScript server plumbs four duplex streams:
 | **STT** | a Deepgram-compatible WS server (batch in v0.1, streaming v0.2) | `stt.adapter` |
 | **TTS** | [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI) (OpenAI `/v1/audio/speech`) | `tts.adapter` |
 | **Agent** | a persistent `claude` CLI session (stream-json) | `agent.adapter` |
-| **Client** | React PWA, orb + transcript, served by the same server over HTTPS | — |
+| **Client** | React app — Android APK (Capacitor) or browser PWA, orb + live transcript | — |
 
 The client talks to the server over one WebSocket carrying JSON control frames and
 binary audio (16 kHz int16 up, 24 kHz int16 down). See
@@ -58,22 +59,34 @@ binary audio (16 kHz int16 up, 24 kHz int16 down). See
 
 ## Quick start
 
+### 1. Run the server (your home box)
+
 ```bash
-git clone <repo> loqui && cd loqui
+git clone https://github.com/abhi-wan-kenobi/loqui && cd loqui
 npm install
 npm run build
 
 cp config.example.json ~/.config/loqui/config.json   # then edit it
 # secrets go in ~/.config/loqui/.env  (e.g. LOQUI_STT_TOKEN=…)
 
-# A secure origin is required for microphone access. Easiest for a home LAN:
-#   mkcert -install && mkcert -cert-file cert.pem -key-file key.pem <your-ip>
-# point config.server.tls at those files, install the mkcert root CA on your phone.
-
-npm start                       # serves https://<host>:8443  (PWA + /ws)
+npm start
 ```
 
-Then open `https://<host>:8443` on your phone and "Add to Home Screen".
+The server listens on two ports (both optional, at least one required):
+
+- `server.httpPort` (e.g. **8480**) — plain HTTP/`ws://`. Zero-setup path for the
+  **Android app** on your LAN.
+- `server.port` + `server.tls` (e.g. **8443**) — HTTPS/`wss://` for the **browser
+  PWA** (browsers require a secure origin for mic access; `mkcert` works well:
+  `mkcert -install && mkcert -cert-file cert.pem -key-file key.pem <your-ip>`).
+
+### 2. Install the Android app
+
+Grab the latest APK from [**Releases**](https://github.com/abhi-wan-kenobi/loqui/releases),
+install it, open Settings (gear) and set your server URL, e.g.
+`ws://192.168.0.42:8480/ws`. Tap the orb and talk. No certificates needed.
+
+Or use the browser PWA instead: open `https://<host>:8443`, "Add to Home Screen".
 
 ### Requirements
 
@@ -95,8 +108,9 @@ See [`config.example.json`](config.example.json). Highlights:
 
 ## Status
 
-**v0.1** (current): push-to-talk, batch STT, streaming TTS, the read-only Claude Code
-brain, HTTPS/PWA, conversation logging. **v0.2**: open-mic + VAD + barge-in, streaming
+**v0.2** (current): Android APK, open-mic + VAD + barge-in, streaming STT, custom
+WebGL orb, the read-only Claude Code brain, conversation logging. **v0.1**:
+push-to-talk browser PWA, batch STT, streaming
 STT. **v0.3**: particle orb, settings/model picker, conversation browser.
 
 ## License
