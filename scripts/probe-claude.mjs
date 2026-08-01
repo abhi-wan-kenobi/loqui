@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Loqui Phase-0 protocol probes for the Claude Code CLI stream-json interface.
 //
-// Verified spawn recipe (CLI 2.1.207, see vault memory claude-cli-stream-json-protocol):
+// Verified spawn recipe (CLI 2.1.207):
 //   claude -p --input-format stream-json --output-format stream-json --verbose \
 //          --permission-prompt-tool stdio --permission-mode default --strict-mcp-config
 // then write an `initialize` control_request, then a user message; answer every
@@ -21,7 +21,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
-const SANDBOX = '/tmp/claude-1000/-home-skywalker-vaults-personal/357f1d1e-3f64-4242-99bf-681719814607/scratchpad/loqui-probe';
+const SANDBOX = path.join(os.tmpdir(), 'loqui-probe');
 const HAIKU = 'claude-haiku-4-5-20251001';
 const BASE_FLAGS = [
   '-p',

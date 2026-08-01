@@ -86,7 +86,7 @@ export class VoiceSession {
     this.voice = cfg.tts.voice;
     this.speed = cfg.tts.speed;
     this.claude = claude;
-    this.vaultLog = new VaultLog(cfg.log.conversationsDir);
+    this.vaultLog = new VaultLog(cfg.log.conversationsDir, cfg.agent.userName);
     this.streaming =
       cfg.stt.adapter === "deepgram-ws" && typeof stt.openStream === "function";
     this.batchFallback = cfg.stt.batchFallback !== false;

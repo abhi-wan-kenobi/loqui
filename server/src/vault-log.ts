@@ -3,10 +3,10 @@
  *   ${conversationsDir}/YYYY-MM-DD.md
  *
  * The first write of the day creates the file with a header + a read-only
- * protection tag so other Claude sessions in the vault won't edit the
- * transcript. We write as the server user (skywalker), so there are no ACL/sync
- * issues. The tag literal is assembled at runtime so this source file is not
- * itself flagged as protected.
+ * protection tag so other agent sessions in the notes directory won't edit the
+ * transcript. The server process owns these writes, so file ownership matches
+ * whatever user runs it. The tag literal is assembled at runtime so this source
+ * file is not itself flagged as protected.
  */
 
 import fs from "node:fs/promises";
@@ -20,7 +20,10 @@ function pad(n: number): string {
 }
 
 export class VaultLog {
-  constructor(private readonly dir: string) {}
+  constructor(
+    private readonly dir: string,
+    private readonly userName?: string,
+  ) {}
 
   async appendTurn(
     userText: string,
@@ -44,7 +47,7 @@ export class VaultLog {
     const parts = [
       `## ${time}`,
       "",
-      `**Abhishek:** ${userText.trim()}`,
+      `**${this.userName?.trim() || "User"}:** ${userText.trim()}`,
       "",
       `**Loqui:** ${assistantText.trim()}`,
     ];

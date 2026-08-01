@@ -21,7 +21,7 @@ import { makeSttAdapter } from "./stt.js";
 import { OpenAiSpeechAdapter } from "./tts.js";
 import { ClaudeSession } from "./claude-session.js";
 import { VoiceSession } from "./session.js";
-import { PERSONA } from "./persona.js";
+import { buildPersona } from "./persona.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // dist/index.js -> server/ -> repo root -> web/dist
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
 
   const stt = makeSttAdapter(cfg, token);
   const tts = new OpenAiSpeechAdapter(cfg);
-  const claude = new ClaudeSession(cfg.agent, PERSONA, stateDir());
+  const claude = new ClaudeSession(cfg.agent, buildPersona(cfg.agent.userName), stateDir());
   const voice = new VoiceSession(cfg, stt, tts, claude);
   const staticServer = new StaticServer(WEB_DIST);
 

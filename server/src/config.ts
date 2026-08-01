@@ -55,6 +55,8 @@ export interface AgentConfig {
   defaultModel: string;
   models: Record<string, AgentModel>;
   dailyRotation?: boolean;
+  /** Name the assistant addresses; also the speaker label in conversation logs. */
+  userName?: string;
 }
 
 export interface LogConfig {
