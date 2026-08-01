@@ -34,7 +34,13 @@ export type ServerMessage =
   | { type: "stt.segment"; text: string; final: boolean }
   /** Incremental assistant text (token/sentence granularity). */
   | { type: "assistant.delta"; text: string }
-  | { type: "assistant.done"; text: string; costUsd?: number }
+  | {
+      type: "assistant.done";
+      text: string;
+      costUsd?: number;
+      /** Per-stage latency breakdown for the turn (debug row in the app). */
+      timings?: { sttMs?: number; ttfbMs?: number; firstAudioMs?: number };
+    }
   /** Agent is using a tool (orb shimmer + caption, e.g. Grep over the vault). */
   | { type: "tool.activity"; tool: string; detail?: string }
   /** A TTS segment is about to stream; binary frames carry this id. */
