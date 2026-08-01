@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ServerMessage } from "@loqui/protocol";
 import type { OrbSkin, Settings } from "../lib/settings";
-import { resolveWsUrl } from "../lib/settings";
+import { resolveWsUrl, NATIVE_SERVER_SUGGESTION } from "../lib/settings";
 import "./SettingsSheet.css";
 
 export type SettingsSheetProps = {
@@ -138,7 +138,7 @@ export function SettingsSheet({ open, settings, onClose, onSave }: SettingsSheet
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="ws://192.168.0.91:8480/ws"
+                placeholder={NATIVE_SERVER_SUGGESTION}
                 value={draft.serverUrl}
                 onChange={(e) => {
                   patch({ serverUrl: e.target.value });

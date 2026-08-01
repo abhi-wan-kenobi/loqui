@@ -39,8 +39,13 @@ export const DEFAULT_SETTINGS: Settings = {
   showTimings: false,
 };
 
-/** Suggested URL prefilled in the native app when no server is configured. */
-export const NATIVE_SERVER_SUGGESTION = "ws://192.168.0.91:8480/ws";
+/**
+ * Suggested URL prefilled in the native app when no server is configured.
+ * A neutral LAN example — the user replaces the host with their own server's
+ * address. Override at build time with VITE_DEFAULT_SERVER for a personal build.
+ */
+export const NATIVE_SERVER_SUGGESTION =
+  import.meta.env.VITE_DEFAULT_SERVER || "ws://192.168.1.100:8480/ws";
 
 const isOrbSkin = (v: string | null): v is OrbSkin => v === "mesh" || v === "stardust";
 
