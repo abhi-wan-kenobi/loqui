@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orb Dev Harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0a0c13;
+        background-image: radial-gradient(ellipse at 50% 30%, rgba(99, 102, 241, 0.14), transparent 60%);
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Dev-only visual harness for the WebGL orb. NOT referenced by index.html, so
+      it is never included in the production bundle (vite build only builds
+      index.html). Drive it with ?skin=mesh|stardust&state=idle|listening|thinking|speaking&level=0.7
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/components/orb/dev/harness.tsx"></script>
+  </body>
+</html>
