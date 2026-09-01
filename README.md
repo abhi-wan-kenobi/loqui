@@ -113,6 +113,14 @@ WebGL orb, the read-only Claude Code brain, conversation logging. **v0.1**:
 push-to-talk browser PWA, batch STT, streaming
 STT. **v0.3**: particle orb, settings/model picker, conversation browser.
 
+## Sponsor
+
+Built in evenings around a full-time job, and released free. Sponsorship pays for the
+parts that cost real money — Apple Developer membership, code-signing certificates, and
+the hours to keep releases working across three platforms.
+
+[Sponsor this work](https://github.com/sponsors/abhi-wan-kenobi) · [SPONSORS.md](SPONSORS.md)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
