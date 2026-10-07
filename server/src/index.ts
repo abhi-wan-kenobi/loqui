@@ -6,6 +6,7 @@
  *  - WS endpoint at /ws (the client connects to wss://host/ws).
  *  - GET /rootCA.pem   -> the mkcert root CA (phone install convenience)
  *  - GET /healthz       -> JSON health snapshot (cached reachability)
+ *  - GET /api/conversations[/YYYY-MM-DD] -> logged days / one day's turns (JSON)
  */
 
 import http from "node:http";
@@ -22,6 +23,7 @@ import { OpenAiSpeechAdapter } from "./tts.js";
 import { ClaudeSession } from "./claude-session.js";
 import { VoiceSession } from "./session.js";
 import { buildPersona } from "./persona.js";
+import { listConversations, readConversation } from "./conversations.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // dist/index.js -> server/ -> repo root -> web/dist
@@ -48,7 +50,8 @@ async function main(): Promise<void> {
   const stt = makeSttAdapter(cfg, token);
   const tts = new OpenAiSpeechAdapter(cfg);
   const claude = new ClaudeSession(cfg.agent, buildPersona(cfg.agent.userName), stateDir());
-  const voice = new VoiceSession(cfg, stt, tts, claude);
+  const voice = new VoiceSession(cfg, stt, tts, claude, stateDir());
+  void voice.refreshVoices();
   const staticServer = new StaticServer(WEB_DIST);
 
   // Warm up the agent (non-fatal if it lags).
@@ -90,6 +93,28 @@ async function main(): Promise<void> {
           tts: h.tts,
         }),
       );
+      return;
+    }
+
+    if (pathname === "/api/conversations" || pathname.startsWith("/api/conversations/")) {
+      // The Android app runs on its own origin (capacitor), so allow any origin
+      // to read — the same LAN clients can already open the WS.
+      const headers = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+      };
+      const dir = cfg.log.conversationsDir;
+      if (pathname === "/api/conversations") {
+        res.writeHead(200, headers).end(JSON.stringify(await listConversations(dir)));
+        return;
+      }
+      const turns = await readConversation(dir, pathname.slice("/api/conversations/".length));
+      if (!turns) {
+        res.writeHead(404, headers).end(JSON.stringify({ error: "no conversation for that date" }));
+        return;
+      }
+      res.writeHead(200, headers).end(JSON.stringify(turns));
       return;
     }
 

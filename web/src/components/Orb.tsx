@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { SessionState } from "@loqui/protocol";
-import type { OrbSkin } from "../lib/settings";
+import { isOrbSkin, type OrbSkin } from "../lib/settings";
 import { OrbEngine, type Skin } from "./orb/OrbEngine";
 import { MeshSkin } from "./orb/skins/MeshSkin";
+import { RibbonsSkin } from "./orb/skins/RibbonsSkin";
 import { StardustSkin } from "./orb/skins/StardustSkin";
 import "./Orb.css";
 
@@ -15,11 +16,19 @@ export type OrbProps = {
 
 const readSkin = (el: Element | null): OrbSkin => {
   const v = el?.closest(".app-shell")?.getAttribute("data-orb-skin");
-  return v === "stardust" ? "stardust" : "mesh";
+  return isOrbSkin(v) ? v : "mesh";
 };
 
-const makeSkin = (skin: OrbSkin, pixelRatio: number): Skin =>
-  skin === "stardust" ? new StardustSkin(pixelRatio) : new MeshSkin(pixelRatio);
+const makeSkin = (skin: OrbSkin, pixelRatio: number): Skin => {
+  switch (skin) {
+    case "stardust":
+      return new StardustSkin(pixelRatio);
+    case "ribbons":
+      return new RibbonsSkin(pixelRatio);
+    case "mesh":
+      return new MeshSkin(pixelRatio);
+  }
+};
 
 /**
  * WebGL orb — a thin React shell around {@link OrbEngine}. The engine owns the

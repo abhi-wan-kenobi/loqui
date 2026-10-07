@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { ServerMessage } from "@loqui/protocol";
+import type { ClientMessage, ServerMessage } from "@loqui/protocol";
+import type { ConfigInfo } from "../lib/session";
 import type { OrbSkin, Settings } from "../lib/settings";
 import { resolveWsUrl, NATIVE_SERVER_SUGGESTION } from "../lib/settings";
 import "./SettingsSheet.css";
@@ -9,7 +10,13 @@ export type SettingsSheetProps = {
   settings: Settings;
   onClose: () => void;
   onSave: (next: Settings) => void;
+  /** Live server-side agent config (null while disconnected). */
+  serverConfig: ConfigInfo | null;
+  /** Apply a server-side change immediately (shared by every client). */
+  onServerConfig: (patch: Omit<Extract<ClientMessage, { type: "config.set" }>, "type">) => void;
 };
+
+const SPEEDS = [0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
 type TestState = { status: "idle" | "testing" | "ok" | "fail"; message?: string };
 
@@ -83,7 +90,14 @@ function Toggle({
   );
 }
 
-export function SettingsSheet({ open, settings, onClose, onSave }: SettingsSheetProps) {
+export function SettingsSheet({
+  open,
+  settings,
+  onClose,
+  onSave,
+  serverConfig,
+  onServerConfig,
+}: SettingsSheetProps) {
   const [draft, setDraft] = useState<Settings>(settings);
   const [test, setTest] = useState<TestState>({ status: "idle" });
 
@@ -157,6 +171,76 @@ export function SettingsSheet({ open, settings, onClose, onSave }: SettingsSheet
             )}
           </div>
 
+          <div className="settings-section">
+            <span className="settings-row__label">Assistant</span>
+            <span className="settings-row__hint">
+              {serverConfig
+                ? "Applies immediately on the server, for every connected device."
+                : "Connect to the server to change the model and voice."}
+            </span>
+          </div>
+
+          {serverConfig && (
+            <>
+              <div className="settings-row settings-row--field">
+                <label className="settings-row__label" htmlFor="agent-model">
+                  Model
+                </label>
+                <select
+                  id="agent-model"
+                  className="settings-select"
+                  value={serverConfig.model}
+                  onChange={(e) => onServerConfig({ model: e.target.value })}
+                >
+                  {serverConfig.models.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {serverConfig.voices.length > 0 && (
+                <div className="settings-row settings-row--field">
+                  <label className="settings-row__label" htmlFor="tts-voice">
+                    Voice
+                  </label>
+                  <select
+                    id="tts-voice"
+                    className="settings-select"
+                    value={serverConfig.voice}
+                    onChange={(e) => onServerConfig({ voice: e.target.value })}
+                  >
+                    {serverConfig.voices.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="settings-row settings-row--field">
+                <label className="settings-row__label" htmlFor="tts-speed">
+                  Speaking speed
+                </label>
+                <select
+                  id="tts-speed"
+                  className="settings-select"
+                  value={String(serverConfig.speed)}
+                  onChange={(e) => onServerConfig({ speed: Number(e.target.value) })}
+                >
+                  {(SPEEDS.includes(serverConfig.speed) ? SPEEDS : [...SPEEDS, serverConfig.speed].sort((x, y) => x - y))
+                    .map((v) => (
+                      <option key={v} value={String(v)}>
+                        {v}×
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </>
+          )}
+
           <Toggle
             label="Half-duplex"
             hint="Mute the mic while the assistant speaks. Turn on if you hear echo."
@@ -190,6 +274,7 @@ export function SettingsSheet({ open, settings, onClose, onSave }: SettingsSheet
             >
               <option value="mesh">Mesh</option>
               <option value="stardust">Stardust</option>
+              <option value="ribbons">Ribbons</option>
             </select>
           </div>
 

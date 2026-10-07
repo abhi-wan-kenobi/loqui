@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { ServerMessage, SessionState } from "@loqui/protocol";
 import { Capacitor } from "@capacitor/core";
 import { LoquiSocket } from "./lib/ws";
 import { MicCapture } from "./lib/mic";
 import { Player } from "./lib/player";
-import { VoiceActivity } from "./lib/vad";
+import type { VoiceActivity } from "./lib/vad";
 import { useSession } from "./lib/session";
 import {
   DEFAULT_SETTINGS,
@@ -15,13 +15,15 @@ import {
   type Settings,
 } from "./lib/settings";
 import { allowSleep, keepAwake } from "./lib/wake";
-import { Orb } from "./components/Orb";
 import { StatusPill } from "./components/StatusPill";
 import { Transcript } from "./components/Transcript";
 import { ControlBar } from "./components/ControlBar";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { SettingsSheet } from "./components/SettingsSheet";
 import "./App.css";
+
+// Dynamic import on purpose: code-splits three.js out of the entry chunk.
+const Orb = lazy(() => import("./components/Orb").then((m) => ({ default: m.Orb })));
 
 function greetingWord(): string {
   const hour = new Date().getHours();
@@ -53,6 +55,8 @@ export function App() {
   const history = useSession((s) => s.history);
   const errorMessage = useSession((s) => s.errorMessage);
   const lastTimings = useSession((s) => s.lastTimings);
+  const serverConfig = useSession((s) => s.config);
+  const connected = useSession((s) => s.connected);
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
@@ -233,6 +237,8 @@ export function App() {
     void keepAwake();
 
     if (!settingsRef.current.pttMode) {
+      // Dynamic import on purpose: onnxruntime/VAD loads only when a hands-free session starts.
+      const { VoiceActivity } = await import("./lib/vad");
       const vad = new VoiceActivity();
       vadRef.current = vad;
       try {
@@ -348,7 +354,12 @@ export function App() {
 
   return (
     <div className="app-shell" data-orb-skin={activeSettings.orbSkin}>
-      <HistoryDrawer open={historyOpen} onOpenChange={setHistoryOpen} entries={history} />
+      <HistoryDrawer
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        entries={history}
+        apiBase={wsUrl ? new URL(wsUrl).origin.replace(/^ws/, "http") : null}
+      />
 
       <div className="app-main">
         <div className="app-top">
@@ -364,7 +375,9 @@ export function App() {
           )}
         </div>
 
-        <Orb state={state} level={orbLevel} onTap={handleOrbTap} />
+        <Suspense fallback={<div className={`orb-wrap state-${state}`} />}>
+          <Orb state={state} level={orbLevel} onTap={handleOrbTap} />
+        </Suspense>
 
         <div className="app-transcript-slot">
           <Transcript liveUser={liveUser} liveAssistant={liveAssistant} />
@@ -394,6 +407,8 @@ export function App() {
         settings={sheetSettings}
         onClose={() => setSettingsOpen(false)}
         onSave={handleSaveSettings}
+        serverConfig={connected ? serverConfig : null}
+        onServerConfig={(patch) => wsRef.current?.send({ type: "config.set", ...patch })}
       />
     </div>
   );

@@ -30,6 +30,16 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       sourcemap: true,
+      rollupOptions: {
+        output: {
+          // Stable vendor chunks; three.js and the VAD are also lazy-loaded from App.
+          manualChunks: {
+            react: ["react", "react-dom"],
+            three: ["three"],
+            vad: ["@ricky0123/vad-web"],
+          },
+        },
+      },
     },
   };
 });

@@ -33,6 +33,11 @@ edit anything else.
 - **Open mic + barge-in** — talk naturally, interrupt mid-sentence. Barge-in
   uses the agent's native interrupt, so context is preserved. Streaming STT
   transcribes while you speak.
+- **Reactive WebGL orb** — three skins (Mesh wireframe, Stardust particle cloud,
+  Ribbons strand loops), each driven by the session state (idle / listening /
+  thinking / speaking) and the live mic or playback level. Pick one in Settings.
+- **Live model + voice picker** — Settings switches the agent model (any key under
+  `agent.models`), TTS voice and speaking speed on the server, for every connected device.
 - **Pluggable adapters** — STT (`deepgram-ws`), TTS (`openai-speech`), agent
   (`claude-code` | `openai-chat`). Add your own by implementing one interface.
 - **Read-only by construction** — the Claude Code agent adapter gates every write
@@ -40,7 +45,9 @@ edit anything else.
   escapes are blocked and regression-tested.
 - **Streaming everywhere** — token-level agent deltas are chunked into sentences and
   spoken as they arrive, so you hear the first words in ~1s after the model starts.
-- **Conversations saved** — each turn is appended to a dated Markdown log.
+- **Conversations saved and browsable** — each turn is appended to a dated Markdown
+  log; the history drawer's **Past** tab lists every logged day and replays it
+  (served read-only at `GET /api/conversations[/YYYY-MM-DD]`).
 
 ## Architecture
 
@@ -110,8 +117,8 @@ See [`config.example.json`](config.example.json). Highlights:
 
 **v0.2** (current): Android APK, open-mic + VAD + barge-in, streaming STT, custom
 WebGL orb, the read-only Claude Code brain, conversation logging. **v0.1**:
-push-to-talk browser PWA, batch STT, streaming
-STT. **v0.3**: particle orb, settings/model picker, conversation browser.
+push-to-talk browser PWA, batch STT, streaming TTS. **v0.3** (in progress): three
+orb skins (Mesh, Stardust, Ribbons), settings/model picker, conversation browser.
 
 ## Sponsor
 

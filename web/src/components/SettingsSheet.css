@@ -241,3 +241,10 @@
 .settings-save:active {
   transform: scale(0.99);
 }
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 4px;
+}

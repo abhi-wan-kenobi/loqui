@@ -16,6 +16,8 @@
  * using the PCM buffered up to that point (when stt.batchFallback is set).
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import type { WebSocket } from "ws";
 import {
   type ClientMessage,
@@ -30,7 +32,11 @@ import { TtsQueue, type TtsAdapter } from "./tts.js";
 import { SentenceChunker } from "./chunker.js";
 import { VaultLog } from "./vault-log.js";
 
-const KOKORO_VOICES = ["af_heart", "af_bella", "af_sky", "am_adam", "bf_emma"];
+/** Offered when the TTS engine can't list its own voices. */
+const FALLBACK_VOICES = ["af_heart", "af_bella", "af_sky", "am_adam", "bf_emma"];
+
+/** Voice settings chosen in the app; survives restarts (model persists in the agent's state). */
+type PersistedVoice = { voice?: string; speed?: number };
 
 /** How long to wait for the streaming engine's tail segment after Finalize. */
 const FINALIZE_TAIL_MS = 4000;
@@ -76,6 +82,9 @@ export class VoiceSession {
   private modelKey: string;
   private voice: string;
   private speed: number;
+  private voices: string[] = FALLBACK_VOICES;
+  private voicesFromEngine = false;
+  private readonly voicePath: string;
 
   private readonly claude: ClaudeSession;
   private readonly ttsQueue: TtsQueue;
@@ -84,12 +93,20 @@ export class VoiceSession {
   constructor(
     private readonly cfg: LoquiConfig,
     private readonly stt: SttAdapter,
-    tts: TtsAdapter,
+    private readonly tts: TtsAdapter,
     claude: ClaudeSession,
+    stateDir: string,
   ) {
     this.modelKey = claude.model || cfg.agent.defaultModel;
-    this.voice = cfg.tts.voice;
-    this.speed = cfg.tts.speed;
+    this.voicePath = path.join(stateDir, "voice.json");
+    let saved: PersistedVoice = {};
+    try {
+      saved = JSON.parse(fs.readFileSync(this.voicePath, "utf8")) as PersistedVoice;
+    } catch {
+      /* first run or unreadable: config defaults */
+    }
+    this.voice = typeof saved.voice === "string" && saved.voice ? saved.voice : cfg.tts.voice;
+    this.speed = typeof saved.speed === "number" && saved.speed > 0 ? saved.speed : cfg.tts.speed;
     this.claude = claude;
     this.vaultLog = new VaultLog(cfg.log.conversationsDir, cfg.agent.userName);
     this.streaming =
@@ -131,6 +148,8 @@ export class VoiceSession {
   addClient(ws: WebSocket): void {
     this.clients.add(ws);
     this.sendTo(ws, this.configMessage());
+    // Engine was down at boot (or never asked): try again now that someone's looking.
+    if (!this.voicesFromEngine) void this.refreshVoices();
     this.sendTo(ws, { type: "state", value: this.state });
 
     ws.on("message", (data: Buffer, isBinary: boolean) => {
@@ -488,13 +507,14 @@ export class VoiceSession {
     speed?: number;
   }): Promise<void> {
     if (typeof msg.voice === "string" && msg.voice) {
-      if (KOKORO_VOICES.includes(msg.voice)) {
+      if (this.voices.includes(msg.voice)) {
         this.voice = msg.voice;
       } else {
         this.broadcast({ type: "error", message: `unknown voice: ${msg.voice}` });
       }
     }
     if (typeof msg.speed === "number" && msg.speed > 0) this.speed = msg.speed;
+    this.saveVoice();
     if (
       typeof msg.model === "string" &&
       msg.model &&
@@ -518,6 +538,25 @@ export class VoiceSession {
     this.broadcast(this.configMessage());
   }
 
+  /** Swap the fallback list for the engine's own, once it answers. */
+  async refreshVoices(): Promise<void> {
+    const list = await this.tts.voices();
+    if (!list) return;
+    this.voices = list;
+    this.voicesFromEngine = true;
+    this.broadcast(this.configMessage());
+  }
+
+  private saveVoice(): void {
+    const data: PersistedVoice = { voice: this.voice, speed: this.speed };
+    try {
+      fs.mkdirSync(path.dirname(this.voicePath), { recursive: true });
+      fs.writeFileSync(this.voicePath, JSON.stringify(data, null, 2));
+    } catch (err) {
+      process.stderr.write(`[loqui] could not save voice settings: ${String(err)}\n`);
+    }
+  }
+
   // ---- outbound ------------------------------------------------------------
 
   private setState(value: SessionState, reason?: string): void {
@@ -531,7 +570,7 @@ export class VoiceSession {
       model: this.modelKey,
       models: Object.keys(this.cfg.agent.models),
       voice: this.voice,
-      voices: KOKORO_VOICES,
+      voices: this.voices,
       speed: this.speed,
     };
   }

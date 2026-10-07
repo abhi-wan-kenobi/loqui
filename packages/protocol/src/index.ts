@@ -64,3 +64,18 @@ export const MIC_SAMPLE_RATE = 16000;
 export const TTS_SAMPLE_RATE = 24000;
 /** Bytes of the uint32-LE segment-id prefix on server->client binary frames. */
 export const TTS_SEGMENT_HEADER_BYTES = 4;
+
+// ---------- conversation browser (HTTP, GET /api/conversations[/:date]) ----------
+
+/** One logged day: `GET /api/conversations` returns these, newest first. */
+export type ConversationDay = { date: string; turns: number };
+
+/** One exchange; `GET /api/conversations/YYYY-MM-DD` returns these in order. */
+export type ConversationTurn = {
+  /** HH:MM, server-local time. */
+  time: string;
+  speaker: string;
+  user: string;
+  assistant: string;
+  costUsd?: number;
+};

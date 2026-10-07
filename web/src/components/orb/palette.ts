@@ -1,7 +1,7 @@
 import { Color } from "three";
 
 /**
- * Colour ramps for the two orb skins, sampled straight off the design refs.
+ * Colour ramps for the orb skins, sampled straight off the design refs.
  *
  * MESH — a diagonal gradient across the sphere: electric blue (top-left) →
  * violet (centre) → hot magenta/pink (bottom-right rim). Fed to the line shader
@@ -9,6 +9,9 @@ import { Color } from "three";
  *
  * STARDUST — cool indigo/blue core with a warm coral→orange band biased to the
  * lower rim, plus a small fraction of random warm flecks.
+ *
+ * RIBBONS — hot pink/magenta strand bundles whose inner edges run coral→orange
+ * and whose pinch points (where strands converge) bloom toward pale pink-white.
  */
 
 export const MESH_RAMP = {
@@ -27,6 +30,14 @@ export const STARDUST_RAMP = {
   coolHi: new Color(0xaac6ff), // cool highlight (front)
   warmMid: new Color(0xff5566), // coral / red
   warmHi: new Color(0xffa23c), // orange
+} as const;
+
+export const RIBBONS_RAMP = {
+  magenta: new Color(0xd42ae0), // bundle body
+  pink: new Color(0xff3cc8), // outer strands
+  coral: new Color(0xff6a3d), // inner-edge warm strands
+  violet: new Color(0x7a4dff), // listening (cool) push
+  white: new Color(0xffd6f2), // pinch-point bloom
 } as const;
 
 /** Convenience: pack a Color into a flat [r,g,b] tuple. */

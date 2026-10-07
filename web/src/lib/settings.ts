@@ -10,10 +10,10 @@ import { Preferences } from "@capacitor/preferences";
  *   serverUrl    string  full ws(s):// URL incl. the /ws path; ""/empty = same-origin
  *   halfDuplex   bool    mute mic + pause VAD while the assistant is speaking
  *   pttMode      bool    push-to-talk fallback (hold the mic button to talk)
- *   orbSkin      string  "mesh" | "stardust"  (consumed by the orb renderer)
+ *   orbSkin      string  "mesh" | "stardust" | "ribbons"  (consumed by the orb renderer)
  *   showTimings  bool    show the per-turn latency debug row
  */
-export type OrbSkin = "mesh" | "stardust";
+export type OrbSkin = "mesh" | "stardust" | "ribbons";
 
 export type Settings = {
   serverUrl: string;
@@ -47,7 +47,8 @@ export const DEFAULT_SETTINGS: Settings = {
 export const NATIVE_SERVER_SUGGESTION =
   import.meta.env.VITE_DEFAULT_SERVER || "ws://192.168.1.100:8480/ws";
 
-const isOrbSkin = (v: string | null): v is OrbSkin => v === "mesh" || v === "stardust";
+export const isOrbSkin = (v: string | null | undefined): v is OrbSkin =>
+  v === "mesh" || v === "stardust" || v === "ribbons";
 
 export async function loadSettings(): Promise<Settings> {
   const [serverUrl, halfDuplex, pttMode, orbSkin, showTimings] = await Promise.all([

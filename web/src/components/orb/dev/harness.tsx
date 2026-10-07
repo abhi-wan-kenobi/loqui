@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { SessionState } from "@loqui/protocol";
+import { isOrbSkin } from "../../../lib/settings";
 import { Orb } from "../../Orb";
 
 /**
@@ -12,7 +13,8 @@ const STATES: SessionState[] = ["idle", "listening", "thinking", "speaking"];
 
 function readParams() {
   const q = new URLSearchParams(location.search);
-  const skin = q.get("skin") === "stardust" ? "stardust" : "mesh";
+  const raw = q.get("skin");
+  const skin = isOrbSkin(raw) ? raw : "mesh";
   const state = (STATES.includes(q.get("state") as SessionState) ? q.get("state") : "idle") as SessionState;
   const level = Math.max(0, Math.min(1, Number(q.get("level") ?? "0")));
   const anim = q.get("anim") === "1";

@@ -284,6 +284,19 @@ export class ClaudeSession {
       }
     });
     proc.on("exit", (code, sig) => this.onExit(code, sig));
+    // Spawn failure (e.g. `claude` not on PATH) emits 'error' without 'exit';
+    // unhandled it kills the server. Report it and leave proc null so the next
+    // turn retries start() instead of hot-looping a respawn.
+    proc.on("error", (e) => {
+      if (this.proc !== proc) return;
+      LIVE.delete(proc);
+      this.proc = null;
+      this.ready = false;
+      process.stderr.write(`[claude:${this.modelKey}] agent process error: ${e.message}\n`);
+      this.cb.onError?.(`agent unavailable: ${e.message}`);
+    });
+    // Writes to a dead/never-started child surface as EPIPE here, not as throws.
+    proc.stdin.on("error", () => {});
     // Kick off the initialize handshake.
     this.send({
       type: "control_request",
@@ -498,6 +511,7 @@ export class ClaudeSession {
     }
     if (!this.proc) {
       await this.start(true);
+      if (!this.proc) throw new Error("agent process is not running");
     }
     this.busy = true;
     this.send({

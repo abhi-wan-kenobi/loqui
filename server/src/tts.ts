@@ -74,6 +74,8 @@ export interface TtsAdapter {
   ): AsyncIterable<Buffer>;
   /** Cheap liveness probe for /healthz. */
   ping(): Promise<boolean>;
+  /** Voices the engine offers, or null if it can't be asked right now. */
+  voices(): Promise<string[] | null>;
   readonly sampleRate: number;
 }
 
@@ -126,6 +128,27 @@ export class OpenAiSpeechAdapter implements TtsAdapter {
     if (signal.aborted) return;
     const tail = aligner.flush();
     if (tail) yield tail;
+  }
+
+  /**
+   * Kokoro-FastAPI's `GET /v1/audio/voices`. Builds differ: the list is either
+   * plain ids or `{ id, name, ... }` objects, so accept both.
+   */
+  async voices(): Promise<string[] | null> {
+    try {
+      const res = await fetch(`${this.base}/v1/audio/voices`, {
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { voices?: unknown };
+      if (!Array.isArray(body.voices)) return null;
+      const ids = body.voices
+        .map((v) => (typeof v === "string" ? v : (v as { id?: unknown })?.id))
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      return ids.length > 0 ? ids : null;
+    } catch {
+      return null;
+    }
   }
 
   async ping(): Promise<boolean> {
