@@ -183,3 +183,7 @@
   color: var(--text-dim);
   border-bottom-left-radius: 4px;
 }
+
+.history-drawer:focus {
+  outline: none;
+}
