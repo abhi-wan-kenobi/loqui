@@ -30,6 +30,8 @@ edit anything else.
 
 - **Android app + browser PWA from one codebase** — install the APK from Releases
   (no certificates, plain `ws://` on your LAN), or add the PWA to your home screen.
+  The PWA opens offline (and says when the server is unreachable), and offers a
+  "reload" when a new version has been deployed; it never reloads mid-conversation.
 - **Open mic + barge-in** — talk naturally, interrupt mid-sentence. Barge-in
   uses the agent's native interrupt, so context is preserved. Streaming STT
   transcribes while you speak.

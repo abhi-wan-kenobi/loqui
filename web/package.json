@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "gen-icons": "node scripts/gen-icons.mjs",
-    "mock-server": "node scripts/mock-server.mjs"
+    "mock-server": "node scripts/mock-server.mjs",
+    "test": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "8.0.1",
