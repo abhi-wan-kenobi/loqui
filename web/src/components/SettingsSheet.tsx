@@ -3,6 +3,7 @@ import type { ClientMessage, ServerMessage } from "@loqui/protocol";
 import type { ConfigInfo } from "../lib/session";
 import type { OrbSkin, Settings } from "../lib/settings";
 import { resolveWsUrl, NATIVE_SERVER_SUGGESTION } from "../lib/settings";
+import { promptInstall, usePwa } from "../lib/pwa";
 import "./SettingsSheet.css";
 
 export type SettingsSheetProps = {
@@ -99,6 +100,7 @@ export function SettingsSheet({
   onServerConfig,
 }: SettingsSheetProps) {
   const [draft, setDraft] = useState<Settings>(settings);
+  const pwa = usePwa();
   const [test, setTest] = useState<TestState>({ status: "idle" });
 
   // Re-sync the local draft whenever the sheet is (re)opened.
@@ -277,6 +279,18 @@ export function SettingsSheet({
               <option value="ribbons">Ribbons</option>
             </select>
           </div>
+
+          {pwa.canInstall && (
+            <div className="settings-row settings-row--about">
+              <span className="settings-row__text">
+                <span className="settings-row__label">Install</span>
+                <span className="settings-row__hint">Add Loqui to your home screen.</span>
+              </span>
+              <button type="button" className="test-btn" onClick={() => void promptInstall()}>
+                Install
+              </button>
+            </div>
+          )}
 
           <div className="settings-row settings-row--about">
             <span className="settings-row__label">About</span>

@@ -14,12 +14,14 @@ import {
   saveSettings,
   type Settings,
 } from "./lib/settings";
+import { applyUpdate, usePwa } from "./lib/pwa";
 import { allowSleep, keepAwake } from "./lib/wake";
 import { StatusPill } from "./components/StatusPill";
 import { Transcript } from "./components/Transcript";
 import { ControlBar } from "./components/ControlBar";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { SettingsSheet } from "./components/SettingsSheet";
+import { ConnectionBanner } from "./components/ConnectionBanner";
 import "./App.css";
 
 // Dynamic import on purpose: code-splits three.js out of the entry chunk.
@@ -57,6 +59,7 @@ export function App() {
   const lastTimings = useSession((s) => s.lastTimings);
   const serverConfig = useSession((s) => s.config);
   const connected = useSession((s) => s.connected);
+  const pwa = usePwa();
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
@@ -388,6 +391,12 @@ export function App() {
 
       <div className="app-controls">
         {errorMessage && <div className="error-banner">{errorMessage}</div>}
+        {pwa.updateReady && (
+          <button type="button" className="update-banner" onClick={applyUpdate}>
+            A new version is ready. Tap to reload.
+          </button>
+        )}
+        <ConnectionBanner connected={connected} hasServer={wsUrl !== null} />
         <ControlBar
           pttMode={activeSettings.pttMode}
           sessionActive={sessionActive}
