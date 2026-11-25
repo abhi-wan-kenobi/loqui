@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { ConversationDay, ConversationTurn } from "@loqui/protocol";
+import { useEffect, useState, type ReactNode } from "react";
+import type { ConversationDay, ConversationHit, ConversationTurn } from "@loqui/protocol";
 import type { TranscriptEntry } from "../lib/session";
 import "./HistoryDrawer.css";
 
@@ -37,11 +37,36 @@ async function getJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+const SEARCH_MIN_CHARS = 2;
+const SEARCH_DEBOUNCE_MS = 250;
+
+/** Wrap case-insensitive occurrences of `query` in <mark>; plain text when there is none. */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < SEARCH_MIN_CHARS) return <>{text}</>;
+  const lower = text.toLowerCase();
+  const parts: ReactNode[] = [];
+  let from = 0;
+  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push(text.slice(from, at));
+    parts.push(<mark key={at}>{text.slice(at, at + needle.length)}</mark>);
+    from = at + needle.length;
+  }
+  parts.push(text.slice(from));
+  return <>{parts}</>;
+}
+
 function PastConversations({ apiBase }: { apiBase: string | null }) {
   const [days, setDays] = useState<ConversationDay[] | null>(null);
   const [date, setDate] = useState<string | null>(null);
+  const [focusTime, setFocusTime] = useState<string | null>(null);
   const [turns, setTurns] = useState<ConversationTurn[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<ConversationHit[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const searching = query.trim().length >= SEARCH_MIN_CHARS;
 
   useEffect(() => {
     if (!apiBase) return;
@@ -68,23 +93,106 @@ function PastConversations({ apiBase }: { apiBase: string | null }) {
     };
   }, [apiBase, date]);
 
+  // Debounced search; a stale response never replaces a newer query's results.
+  useEffect(() => {
+    setSearchError(null);
+    if (!apiBase || !searching) {
+      setHits(null);
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      getJson<ConversationHit[]>(`${apiBase}/api/conversations/search?q=${encodeURIComponent(query.trim())}`)
+        .then((h) => live && setHits(h))
+        .catch((e) => live && setSearchError(`Search failed (${String(e)})`));
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [apiBase, query, searching]);
+
+  // Arriving from a search hit: bring that turn into view once the day has loaded.
+  useEffect(() => {
+    if (!turns || !focusTime) return;
+    document.querySelector(`[data-turn-time="${focusTime}"]`)?.scrollIntoView({ block: "center" });
+  }, [turns, focusTime]);
+
   if (error) return <p className="history-drawer__empty">{error}</p>;
   if (!apiBase) return <p className="history-drawer__empty">No server configured.</p>;
 
   if (date) {
     return (
       <>
-        <button type="button" className="history-drawer__back" onClick={() => setDate(null)}>
+        <button
+          type="button"
+          className="history-drawer__back"
+          onClick={() => {
+            setDate(null);
+            setFocusTime(null);
+          }}
+        >
           ← {date}
         </button>
         {turns === null && <p className="history-drawer__empty">Loading…</p>}
         {turns?.length === 0 && <p className="history-drawer__empty">No turns in this log.</p>}
         {turns?.map((t, i) => (
-          <div key={i} className="history-drawer__turn">
+          <div key={i} className="history-drawer__turn" data-turn-time={t.time}>
             <span className="history-drawer__time">{t.time}</span>
-            <div className="bubble bubble--user">{t.user}</div>
-            <div className="bubble bubble--assistant">{t.assistant}</div>
+            <div className="bubble bubble--user">
+              <Highlight text={t.user} query={query} />
+            </div>
+            <div className="bubble bubble--assistant">
+              <Highlight text={t.assistant} query={query} />
+            </div>
           </div>
+        ))}
+      </>
+    );
+  }
+
+  const searchBox = (
+    <input
+      type="search"
+      className="history-drawer__search"
+      placeholder="Search conversations"
+      aria-label="Search conversations"
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
+      maxLength={200}
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+    />
+  );
+
+  if (searching) {
+    return (
+      <>
+        {searchBox}
+        {searchError && <p className="history-drawer__empty">{searchError}</p>}
+        {!searchError && hits === null && <p className="history-drawer__empty">Searching…</p>}
+        {!searchError && hits?.length === 0 && <p className="history-drawer__empty">No matches.</p>}
+        {hits?.map((h) => (
+          <button
+            key={`${h.date}-${h.time}`}
+            type="button"
+            className="history-drawer__hit"
+            onClick={() => {
+              setFocusTime(h.time);
+              setDate(h.date);
+            }}
+          >
+            <span className="history-drawer__count">
+              {h.date} · {h.time}
+            </span>
+            <span className="history-drawer__snippet">
+              <Highlight text={h.user} query={query} />
+            </span>
+            <span className="history-drawer__snippet history-drawer__snippet--dim">
+              <Highlight text={h.assistant} query={query} />
+            </span>
+          </button>
         ))}
       </>
     );
@@ -94,6 +202,7 @@ function PastConversations({ apiBase }: { apiBase: string | null }) {
   if (days.length === 0) return <p className="history-drawer__empty">No saved conversations yet.</p>;
   return (
     <>
+      {searchBox}
       {days.map((d) => (
         <button key={d.date} type="button" className="history-drawer__day" onClick={() => setDate(d.date)}>
           <span>{d.date}</span>

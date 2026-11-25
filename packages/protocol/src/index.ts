@@ -79,3 +79,6 @@ export type ConversationTurn = {
   assistant: string;
   costUsd?: number;
 };
+
+/** One match from `GET /api/conversations/search?q=`: the turn plus the day it is on. */
+export type ConversationHit = ConversationTurn & { date: string };

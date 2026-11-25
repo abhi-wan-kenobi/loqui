@@ -23,7 +23,7 @@ import { OpenAiSpeechAdapter } from "./tts.js";
 import { ClaudeSession } from "./claude-session.js";
 import { VoiceSession } from "./session.js";
 import { buildPersona } from "./persona.js";
-import { listConversations, readConversation } from "./conversations.js";
+import { listConversations, readConversation, searchConversations } from "./conversations.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // dist/index.js -> server/ -> repo root -> web/dist
@@ -107,6 +107,11 @@ async function main(): Promise<void> {
       const dir = cfg.log.conversationsDir;
       if (pathname === "/api/conversations") {
         res.writeHead(200, headers).end(JSON.stringify(await listConversations(dir)));
+        return;
+      }
+      if (pathname === "/api/conversations/search") {
+        const q = new URL(url, "http://localhost").searchParams.get("q") ?? "";
+        res.writeHead(200, headers).end(JSON.stringify(await searchConversations(dir, q)));
         return;
       }
       const turns = await readConversation(dir, pathname.slice("/api/conversations/".length));
