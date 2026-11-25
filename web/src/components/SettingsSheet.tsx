@@ -3,6 +3,7 @@ import type { ClientMessage, ServerMessage } from "@loqui/protocol";
 import type { ConfigInfo } from "../lib/session";
 import type { OrbSkin, Settings } from "../lib/settings";
 import { resolveWsUrl, NATIVE_SERVER_SUGGESTION } from "../lib/settings";
+import { useDialog } from "../lib/dialog";
 import "./SettingsSheet.css";
 
 export type SettingsSheetProps = {
@@ -100,6 +101,7 @@ export function SettingsSheet({
 }: SettingsSheetProps) {
   const [draft, setDraft] = useState<Settings>(settings);
   const [test, setTest] = useState<TestState>({ status: "idle" });
+  const dialogRef = useDialog<HTMLDivElement>(open, onClose);
 
   // Re-sync the local draft whenever the sheet is (re)opened.
   useEffect(() => {
@@ -127,7 +129,14 @@ export function SettingsSheet({
   return (
     <>
       <div className="sheet-overlay" onClick={onClose} />
-      <div className="settings-sheet" role="dialog" aria-label="Settings" aria-modal="true">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="settings-sheet"
+        role="dialog"
+        aria-label="Settings"
+        aria-modal="true"
+      >
         <div className="settings-sheet__grip" />
         <div className="settings-sheet__header">
           <span className="settings-sheet__title">Settings</span>
