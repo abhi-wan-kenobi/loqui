@@ -9,7 +9,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ConversationDay, ConversationTurn } from "@loqui/protocol";
+import type { ConversationDay, ConversationHit, ConversationTurn } from "@loqui/protocol";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const FILE_RE = /^(\d{4}-\d{2}-\d{2})\.md$/;
@@ -38,25 +38,53 @@ export function parseConversation(markdown: string): ConversationTurn[] {
   return turns;
 }
 
-/** Days that have a log, newest first, with their turn counts. */
-export async function listConversations(dir: string): Promise<ConversationDay[]> {
+/** Dates that have a log file, newest first. */
+async function logDates(dir: string): Promise<string[]> {
   let names: string[];
   try {
     names = await fs.readdir(dir);
   } catch {
     return [];
   }
-  const dates = names
+  return names
     .map((n) => FILE_RE.exec(n)?.[1])
     .filter((d): d is string => d !== undefined)
     .sort()
     .reverse();
+}
+
+/** Days that have a log, newest first, with their turn counts. */
+export async function listConversations(dir: string): Promise<ConversationDay[]> {
   const days: ConversationDay[] = [];
-  for (const date of dates) {
+  for (const date of await logDates(dir)) {
     const turns = await readConversation(dir, date);
     if (turns) days.push({ date, turns: turns.length });
   }
   return days;
+}
+
+export const SEARCH_MIN_CHARS = 2;
+export const SEARCH_MAX_CHARS = 200;
+export const SEARCH_MAX_HITS = 50;
+
+/**
+ * Turns whose question or answer contains `query` (case-insensitive, literal
+ * text), newest day first and in time order within a day, at most
+ * SEARCH_MAX_HITS. A query outside the length limits matches nothing.
+ */
+export async function searchConversations(dir: string, query: string): Promise<ConversationHit[]> {
+  const needle = query.trim().toLowerCase();
+  if (needle.length < SEARCH_MIN_CHARS || needle.length > SEARCH_MAX_CHARS) return [];
+  const hits: ConversationHit[] = [];
+  for (const date of await logDates(dir)) {
+    for (const turn of (await readConversation(dir, date)) ?? []) {
+      if (turn.user.toLowerCase().includes(needle) || turn.assistant.toLowerCase().includes(needle)) {
+        hits.push({ ...turn, date });
+        if (hits.length >= SEARCH_MAX_HITS) return hits;
+      }
+    }
+  }
+  return hits;
 }
 
 /** One day's turns, or null if the date is malformed or has no log file. */

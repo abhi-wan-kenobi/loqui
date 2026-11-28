@@ -8,7 +8,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { VaultLog } from "./vault-log.js";
-import { listConversations, parseConversation, readConversation } from "./conversations.js";
+import {
+  SEARCH_MAX_HITS,
+  listConversations,
+  parseConversation,
+  readConversation,
+  searchConversations,
+} from "./conversations.js";
 
 function tmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "loqui-conv-"));
@@ -67,4 +73,44 @@ test("skips malformed blocks instead of failing the day", () => {
   assert.deepEqual(parseConversation(md), [
     { time: "10:05", speaker: "User", user: "a", assistant: "b" },
   ]);
+});
+
+test("search finds turns by question or answer, newest day first, case-insensitively", async () => {
+  const dir = tmpDir();
+  const day = (turns: Array<[string, string, string]>) =>
+    "# Loqui\n\n" + turns.map(([t, u, a]) => `## ${t}\n\n**User:** ${u}\n\n**Loqui:** ${a}\n\n`).join("");
+  fs.writeFileSync(path.join(dir, "2026-08-01.md"), day([["09:00", "Remind me about the Dentist", "Noted."]]));
+  fs.writeFileSync(
+    path.join(dir, "2026-09-15.md"),
+    day([
+      ["08:00", "weather?", "Sunny."],
+      ["18:30", "what did I say about the roadmap", "You mentioned the dentist twice."],
+    ]),
+  );
+
+  const hits = await searchConversations(dir, "  DENTIST ");
+  assert.deepEqual(
+    hits.map((h) => [h.date, h.time]),
+    [
+      ["2026-09-15", "18:30"],
+      ["2026-08-01", "09:00"],
+    ],
+  );
+  assert.equal(hits[0]!.assistant, "You mentioned the dentist twice.");
+  assert.deepEqual(await searchConversations(dir, "nothing like this"), []);
+});
+
+test("search treats the query as literal text and bounds its input and output", async () => {
+  const dir = tmpDir();
+  const turns = Array.from(
+    { length: SEARCH_MAX_HITS + 10 },
+    (_, i) => `## 10:${String(i).padStart(2, "0")}\n\n**User:** cost is $5 (a+b)\n\n**Loqui:** ok\n\n`,
+  );
+  fs.writeFileSync(path.join(dir, "2026-09-15.md"), "# Loqui\n\n" + turns.join(""));
+
+  assert.equal((await searchConversations(dir, "$5 (a+b)")).length, SEARCH_MAX_HITS);
+  assert.deepEqual(await searchConversations(dir, ".*"), []);
+  assert.deepEqual(await searchConversations(dir, "o"), []); // too short
+  assert.deepEqual(await searchConversations(dir, "x".repeat(201)), []); // too long
+  assert.deepEqual(await searchConversations(path.join(dir, "missing"), "anything"), []);
 });
