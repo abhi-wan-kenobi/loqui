@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { createRequire } from "node:module";
+import { swPrecachePlugin } from "./scripts/precache.mjs";
 
 const { version } = createRequire(import.meta.url)("./package.json") as { version: string };
 
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
   const wsTarget = env.VITE_WS_TARGET || "wss://localhost:8443";
 
   return {
-    plugins: [react()],
+    plugins: [react(), swPrecachePlugin()],
     define: {
       "import.meta.env.VITE_APP_VERSION": JSON.stringify(version),
     },

@@ -1,7 +1,10 @@
 {
+  "id": "/",
   "name": "Loqui",
   "short_name": "Loqui",
   "description": "Speak to your own self-hosted AI agent.",
+  "lang": "en",
+  "categories": ["productivity", "utilities"],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

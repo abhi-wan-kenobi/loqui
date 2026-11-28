@@ -30,6 +30,8 @@ edit anything else.
 
 - **Android app + browser PWA from one codebase** — install the APK from Releases
   (no certificates, plain `ws://` on your LAN), or add the PWA to your home screen.
+  The PWA opens offline (and says when the server is unreachable), and offers a
+  "reload" when a new version has been deployed; it never reloads mid-conversation.
 - **Open mic + barge-in** — talk naturally, interrupt mid-sentence. Barge-in
   uses the agent's native interrupt, so context is preserved. Streaming STT
   transcribes while you speak.
@@ -45,9 +47,9 @@ edit anything else.
   escapes are blocked and regression-tested.
 - **Streaming everywhere** — token-level agent deltas are chunked into sentences and
   spoken as they arrive, so you hear the first words in ~1s after the model starts.
-- **Conversations saved and browsable** — each turn is appended to a dated Markdown
-  log; the history drawer's **Past** tab lists every logged day and replays it
-  (served read-only at `GET /api/conversations[/YYYY-MM-DD]`).
+- **Conversations saved, searchable and browsable** — each turn is appended to a
+  dated Markdown log; the history drawer's **Past** tab searches every logged day
+  and replays it (served read-only at `GET /api/conversations[/YYYY-MM-DD]`).
 
 ## Architecture
 
@@ -115,10 +117,11 @@ See [`config.example.json`](config.example.json). Highlights:
 
 ## Status
 
-**v0.2** (current): Android APK, open-mic + VAD + barge-in, streaming STT, custom
-WebGL orb, the read-only Claude Code brain, conversation logging. **v0.1**:
-push-to-talk browser PWA, batch STT, streaming TTS. **v0.3** (in progress): three
-orb skins (Mesh, Stardust, Ribbons), settings/model picker, conversation browser.
+**v0.2.1** (current stable): Android APK, open-mic + VAD + barge-in, streaming
+STT, custom WebGL orb, the read-only Claude Code brain and conversation logging.
+**v0.3.0** (release candidate): three orb skins (Mesh, Stardust, Ribbons),
+live model/voice/speed settings, searchable conversation history, an offline app
+shell with explicit updates, connection status, and keyboard-accessible dialogs.
 
 ## Sponsor
 

@@ -27,3 +27,6 @@ jobs:
 
       - name: Test server
         run: npm test -w server
+
+      - name: Test web
+        run: npm test -w web

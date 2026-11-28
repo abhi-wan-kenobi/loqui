@@ -85,11 +85,22 @@ export class StaticServer {
       res.writeHead(200, {
         "Content-Type": contentType(file),
         "Content-Length": body.length,
+        "Cache-Control": this.cacheControl(file),
       });
       res.end(body);
       return true;
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Vite fingerprints everything under assets/, so those files never change
+   * under one name. Everything else (index.html, sw.js, manifest, icons) must
+   * be revalidated, or a deploy would not reach installed clients.
+   */
+  private cacheControl(file: string): string {
+    const rel = this.root ? path.relative(this.root, file).split(path.sep).join("/") : "";
+    return rel.startsWith("assets/") ? "public, max-age=31536000, immutable" : "no-cache";
   }
 }

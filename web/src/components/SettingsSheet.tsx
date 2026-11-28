@@ -3,6 +3,8 @@ import type { ClientMessage, ServerMessage } from "@loqui/protocol";
 import type { ConfigInfo } from "../lib/session";
 import type { OrbSkin, Settings } from "../lib/settings";
 import { resolveWsUrl, NATIVE_SERVER_SUGGESTION } from "../lib/settings";
+import { promptInstall, usePwa } from "../lib/pwa";
+import { useDialog } from "../lib/dialog";
 import "./SettingsSheet.css";
 
 export type SettingsSheetProps = {
@@ -99,7 +101,9 @@ export function SettingsSheet({
   onServerConfig,
 }: SettingsSheetProps) {
   const [draft, setDraft] = useState<Settings>(settings);
+  const pwa = usePwa();
   const [test, setTest] = useState<TestState>({ status: "idle" });
+  const dialogRef = useDialog<HTMLDivElement>(open, onClose);
 
   // Re-sync the local draft whenever the sheet is (re)opened.
   useEffect(() => {
@@ -127,7 +131,14 @@ export function SettingsSheet({
   return (
     <>
       <div className="sheet-overlay" onClick={onClose} />
-      <div className="settings-sheet" role="dialog" aria-label="Settings" aria-modal="true">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="settings-sheet"
+        role="dialog"
+        aria-label="Settings"
+        aria-modal="true"
+      >
         <div className="settings-sheet__grip" />
         <div className="settings-sheet__header">
           <span className="settings-sheet__title">Settings</span>
@@ -277,6 +288,18 @@ export function SettingsSheet({
               <option value="ribbons">Ribbons</option>
             </select>
           </div>
+
+          {pwa.canInstall && (
+            <div className="settings-row settings-row--about">
+              <span className="settings-row__text">
+                <span className="settings-row__label">Install</span>
+                <span className="settings-row__hint">Add Loqui to your home screen.</span>
+              </span>
+              <button type="button" className="test-btn" onClick={() => void promptInstall()}>
+                Install
+              </button>
+            </div>
+          )}
 
           <div className="settings-row settings-row--about">
             <span className="settings-row__label">About</span>
