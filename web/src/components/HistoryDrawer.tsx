@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { ConversationDay, ConversationHit, ConversationTurn } from "@loqui/protocol";
 import type { TranscriptEntry } from "../lib/session";
+import { useDialog } from "../lib/dialog";
 import "./HistoryDrawer.css";
 
 export type HistoryDrawerProps = {
@@ -217,6 +218,7 @@ function PastConversations({ apiBase }: { apiBase: string | null }) {
 
 export function HistoryDrawer({ open, onOpenChange, entries, apiBase }: HistoryDrawerProps) {
   const [tab, setTab] = useState<Tab>("session");
+  const dialogRef = useDialog<HTMLElement>(open, () => onOpenChange(false));
 
   return (
     <>
@@ -232,7 +234,7 @@ export function HistoryDrawer({ open, onOpenChange, entries, apiBase }: HistoryD
       {open && (
         <>
           <div className="history-drawer-overlay" onClick={() => onOpenChange(false)} />
-          <aside className="history-drawer" role="dialog" aria-label="History">
+          <aside ref={dialogRef} tabIndex={-1} className="history-drawer" role="dialog" aria-label="History">
             <div className="history-drawer__header">
               <div className="history-drawer__tabs" role="tablist">
                 <button
