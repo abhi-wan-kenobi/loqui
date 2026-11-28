@@ -233,6 +233,8 @@
   color: var(--text);
   border-radius: 3px;
   padding: 0 1px;
+}
+
 .history-drawer:focus {
   outline: none;
 }
